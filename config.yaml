@@ -1,0 +1,110 @@
+# PingCode MCP 服务器配置文件
+# 配置文件版本
+version: "1.0.0"
+
+# 服务器配置
+server:
+  name: "pingcode-mcp-server"
+  version: "1.0.0"
+  port: 8080
+  host: "0.0.0.0"
+  
+  # 超时配置
+  timeout:
+    read: 30s
+    write: 30s
+    idle: 60s
+    shutdown: 10s
+
+# 日志配置
+logging:
+  level: "info"  # debug, info, warn, error, fatal
+  format: "json"  # json, console
+  output: "both"  # console, file, both
+  
+  # 文件日志配置
+  file:
+    path: "logs"
+    filename: "app.log"
+    max_size: 100  # MB
+    max_age: 7     # days
+    max_backups: 10
+    compress: true
+    
+  # 日志轮转配置
+  rotation:
+    enabled: true
+    daily: true
+
+# API 配置
+api:
+  # IP查询服务配置
+  ip_search:
+    url: "https://whois.suyun.store/query"
+    timeout: 10s
+    retry_count: 3
+    retry_delay: 1s
+    
+  # 用户信息服务配置
+  user_info:
+    url: "https://api.pingcode.com/v1/user/info"
+    timeout: 15s
+    retry_count: 2
+    retry_delay: 2s
+
+# 认证配置
+auth:
+  # Token 配置
+  token:
+    header_name: "Authorization"
+    prefix: "Bearer "
+    
+  # 会话配置
+  session:
+    timeout: 3600s  # 1小时
+    refresh_threshold: 300s  # 5分钟
+
+# 性能配置
+performance:
+  # HTTP客户端配置
+  http_client:
+    max_idle_conns: 100
+    max_idle_conns_per_host: 10
+    idle_conn_timeout: 90s
+    
+  # 并发配置
+  concurrency:
+    max_workers: 50
+    queue_size: 1000
+
+# 监控配置
+monitoring:
+  # 健康检查
+  health_check:
+    enabled: true
+    path: "/health"
+    interval: 30s
+    
+  # 指标收集
+  metrics:
+    enabled: true
+    path: "/metrics"
+    
+# 开发环境配置
+development:
+  debug: false
+  hot_reload: false
+  profiling: false
+
+# 生产环境配置
+production:
+  debug: false
+  profiling: false
+  
+# 环境变量覆盖配置
+# 支持通过环境变量覆盖配置项
+# 格式: PINGCODE_MCP_<SECTION>_<KEY>
+# 例如: PINGCODE_MCP_SERVER_PORT=9090
+env_override:
+  enabled: true
+  prefix: "PINGCODE_MCP" 

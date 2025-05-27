@@ -17,8 +17,8 @@ func NewMCPServer() *MCPServer {
 	cfg := config.Load()
 
 	mcpServer := server.NewMCPServer(
-		cfg.ServerName,
-		cfg.ServerVersion,
+		cfg.GetServerName(),
+		cfg.GetServerVersion(),
 		server.WithResourceCapabilities(true, true),
 		server.WithPromptCapabilities(true),
 		server.WithToolCapabilities(true),

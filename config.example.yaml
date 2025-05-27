@@ -1,0 +1,123 @@
+# PingCode MCP 服务器配置示例文件
+# 复制此文件为 config.yaml 并根据需要修改配置
+
+# 配置文件版本
+version: "1.0.0"
+
+# 服务器配置
+server:
+  name: "pingcode-mcp-server"    # 服务器名称
+  version: "1.0.0"               # 服务器版本
+  port: 8080                     # 监听端口
+  host: "0.0.0.0"               # 监听地址 (0.0.0.0 表示所有接口)
+  
+  # 超时配置
+  timeout:
+    read: 30s      # HTTP 读取超时
+    write: 30s     # HTTP 写入超时
+    idle: 60s      # HTTP 空闲连接超时
+    shutdown: 10s  # 服务器优雅关闭超时
+
+# 日志配置
+logging:
+  level: "info"    # 日志级别: debug, info, warn, error, fatal
+  format: "json"   # 日志格式: json (结构化), console (人类可读)
+  output: "both"   # 输出方式: console (控制台), file (文件), both (两者)
+  
+  # 文件日志配置
+  file:
+    path: "logs"           # 日志文件目录
+    filename: "app.log"    # 日志文件名
+    max_size: 100          # 单个文件最大大小 (MB)
+    max_age: 7             # 日志文件保留天数
+    max_backups: 10        # 最大备份文件数量
+    compress: true         # 是否压缩旧的日志文件
+    
+  # 日志轮转配置
+  rotation:
+    enabled: true          # 是否启用日志轮转
+    daily: true           # 是否按日期轮转
+
+# API 服务配置
+api:
+  # IP 地理位置查询服务
+  ip_search:
+    url: "https://whois.suyun.store/query"  # API 地址
+    timeout: 10s                            # 请求超时时间
+    retry_count: 3                          # 失败重试次数
+    retry_delay: 1s                         # 重试间隔时间
+    
+  # 用户信息查询服务
+  user_info:
+    url: "https://api.pingcode.com/v1/user/info"  # API 地址
+    timeout: 15s                                  # 请求超时时间
+    retry_count: 2                                # 失败重试次数
+    retry_delay: 2s                               # 重试间隔时间
+
+# 认证和授权配置
+auth:
+  # Token 配置
+  token:
+    header_name: "Authorization"  # Token 请求头名称
+    prefix: "Bearer "            # Token 前缀
+    
+  # 会话配置
+  session:
+    timeout: 3600s          # 会话超时时间 (1小时)
+    refresh_threshold: 300s # 会话刷新阈值 (5分钟)
+
+# 性能优化配置
+performance:
+  # HTTP 客户端配置
+  http_client:
+    max_idle_conns: 100         # 最大空闲连接数
+    max_idle_conns_per_host: 10 # 每个主机最大空闲连接数
+    idle_conn_timeout: 90s      # 空闲连接超时时间
+    
+  # 并发处理配置
+  concurrency:
+    max_workers: 50    # 最大工作协程数
+    queue_size: 1000   # 任务队列大小
+
+# 监控和健康检查配置
+monitoring:
+  # 健康检查
+  health_check:
+    enabled: true      # 是否启用健康检查
+    path: "/health"    # 健康检查路径
+    interval: 30s      # 健康检查间隔
+    
+  # 性能指标收集
+  metrics:
+    enabled: true      # 是否启用指标收集
+    path: "/metrics"   # 指标暴露路径
+
+# 开发环境特定配置
+development:
+  debug: false       # 是否启用调试模式
+  hot_reload: false  # 是否启用热重载 (开发时有用)
+  profiling: false   # 是否启用性能分析
+
+# 生产环境特定配置
+production:
+  debug: false       # 生产环境应关闭调试
+  profiling: false   # 生产环境通常关闭性能分析
+
+# 环境变量覆盖配置
+env_override:
+  enabled: true           # 是否允许环境变量覆盖配置
+  prefix: "PINGCODE_MCP"  # 环境变量前缀
+
+# 配置说明:
+# 1. 所有时间配置支持的单位: ns, us, ms, s, m, h
+# 2. 环境变量格式: {prefix}_{section}_{key}, 例如: PINGCODE_MCP_SERVER_PORT=9090
+# 3. 布尔值: true/false
+# 4. 字符串值需要用引号包围
+# 5. 数字值不需要引号
+
+# 常用环境变量示例:
+# export PINGCODE_MCP_SERVER_PORT=9090
+# export PINGCODE_MCP_LOGGING_LEVEL=debug
+# export PINGCODE_MCP_LOGGING_OUTPUT=console
+# export PINGCODE_MCP_API_IP_SEARCH_URL=https://custom-api.com/ip
+# export PINGCODE_MCP_API_USER_INFO_URL=https://custom-api.com/user 

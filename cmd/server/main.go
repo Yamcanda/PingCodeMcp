@@ -24,12 +24,12 @@ func main() {
 	// 启动 HTTP 服务器
 	httpServer := s.ServeHTTP()
 
-	log.Infof("Starting %s v%s", cfg.ServerName, cfg.ServerVersion)
-	log.Infof("HTTP server listening on :%s", cfg.Port)
+	log.Infof("Starting %s v%s", cfg.GetServerName(), cfg.GetServerVersion())
+	log.Infof("HTTP server listening on :%s", cfg.GetPort())
 
 	// 使用 goroutine 异步启动服务器
 	go func() {
-		if err := httpServer.Start(":" + cfg.Port); err != nil {
+		if err := httpServer.Start(":" + cfg.GetPort()); err != nil {
 			log.Fatal("Server error:", err)
 		}
 	}()
