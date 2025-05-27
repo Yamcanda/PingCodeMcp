@@ -52,6 +52,13 @@ api:
     retry_count: 2
     retry_delay: 2s
 
+  # 企业成员列表服务配置
+  enterprise_users:
+    url: "https://open.pingcode.com/v1/directory/users"
+    timeout: 15s
+    retry_count: 2
+    retry_delay: 2s
+
 # 认证配置
 auth:
   # Token 配置

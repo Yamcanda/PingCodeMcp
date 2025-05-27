@@ -71,3 +71,25 @@ func DoPostJSON(ctx context.Context, rawURL string, headers map[string]string, j
 	headers["Content-Type"] = "application/json"
 	return DoPost(ctx, rawURL, headers, bytes.NewReader(jsonBody))
 }
+
+// DoPatch 发送 PATCH 请求，支持自定义 header、body
+func DoPatch(ctx context.Context, rawURL string, headers map[string]string, body []byte) ([]byte, *http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, rawURL, bytes.NewReader(body))
+	if err != nil {
+		return nil, nil, err
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, resp, err
+	}
+	return respBody, resp, nil
+}

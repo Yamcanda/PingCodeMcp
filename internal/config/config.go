@@ -68,8 +68,9 @@ type RotationConfig struct {
 
 // APIConfig API配置
 type APIConfig struct {
-	IPSearch IPSearchConfig `yaml:"ip_search"`
-	UserInfo UserInfoConfig `yaml:"user_info"`
+	IPSearch        IPSearchConfig        `yaml:"ip_search"`
+	UserInfo        UserInfoConfig        `yaml:"user_info"`
+	EnterpriseUsers EnterpriseUsersConfig `yaml:"enterprise_users"`
 }
 
 // IPSearchConfig IP查询服务配置
@@ -82,6 +83,14 @@ type IPSearchConfig struct {
 
 // UserInfoConfig 用户信息服务配置
 type UserInfoConfig struct {
+	URL        string        `yaml:"url"`
+	Timeout    time.Duration `yaml:"timeout"`
+	RetryCount int           `yaml:"retry_count"`
+	RetryDelay time.Duration `yaml:"retry_delay"`
+}
+
+// EnterpriseUsersConfig 企业成员列表服务配置
+type EnterpriseUsersConfig struct {
 	URL        string        `yaml:"url"`
 	Timeout    time.Duration `yaml:"timeout"`
 	RetryCount int           `yaml:"retry_count"`
@@ -273,6 +282,12 @@ func getDefaultConfig() *Config {
 				RetryCount: 2,
 				RetryDelay: 2 * time.Second,
 			},
+			EnterpriseUsers: EnterpriseUsersConfig{
+				URL:        "https://api.pingcode.com/v1/enterprise/users",
+				Timeout:    15 * time.Second,
+				RetryCount: 2,
+				RetryDelay: 2 * time.Second,
+			},
 		},
 		Auth: AuthConfig{
 			Token: TokenConfig{
@@ -359,6 +374,9 @@ func applyEnvOverrides(config *Config) {
 	}
 	if val := os.Getenv(prefix + "API_USER_INFO_URL"); val != "" {
 		config.API.UserInfo.URL = val
+	}
+	if val := os.Getenv(prefix + "API_ENTERPRISE_USERS_URL"); val != "" {
+		config.API.EnterpriseUsers.URL = val
 	}
 }
 

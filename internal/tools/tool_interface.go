@@ -35,6 +35,8 @@ func RegisterAllTools(mcpServer *server.MCPServer, cfg *config.Config) {
 		NewIpSearchTool(cfg),
 		NewUserInfoTool(cfg),
 		NewAuthenticatedRequestTool(cfg),
+		NewEnterpriseUsersTool(cfg),
+		NewCreateEnterpriseUserTool(cfg),
 	}
 
 	for _, tool := range tools {
