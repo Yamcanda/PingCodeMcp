@@ -19,11 +19,7 @@ func Example() {
 	log.Errorf("连接数据库失败: %v", "connection timeout")
 
 	// 结构化日志 - 添加上下文字段
-	contextLogger := log.With(
-		"user_id", 12345,
-		"request_id", "req-abc-123",
-		"ip", "192.168.1.1",
-	)
+	contextLogger := log.With("user_id", 12345, "request_id", "req-abc-123", "ip", "192.168.1.1")
 
 	contextLogger.Info("用户执行了操作")
 	contextLogger.Error("操作失败")
@@ -34,20 +30,10 @@ func Example() {
 	time.Sleep(10 * time.Millisecond)
 	duration := time.Since(start)
 
-	log.With(
-		"operation", "database_query",
-		"duration_ms", duration.Milliseconds(),
-		"success", true,
-	).Info("数据库查询完成")
+	log.With("operation", "database_query", "duration_ms", duration.Milliseconds(), "success", true).Info("数据库查询完成")
 
 	// 记录HTTP请求
-	log.With(
-		"method", "POST",
-		"path", "/api/users",
-		"status_code", 201,
-		"response_time_ms", 45,
-		"user_agent", "Mozilla/5.0",
-	).Info("HTTP请求处理完成")
+	log.With("method", "POST", "path", "/api/users", "status_code", 201, "response_time_ms", 45, "user_agent", "Mozilla/5.0").Info("HTTP请求处理完成")
 }
 
 // ExampleProduction demonstrates production logger usage
@@ -59,9 +45,5 @@ func ExampleProduction() {
 	log.Info("生产环境日志示例")
 
 	// 生产环境通常使用结构化日志
-	log.With(
-		"service", "user-service",
-		"version", "1.2.3",
-		"environment", "production",
-	).Info("服务启动")
+	log.With("service", "user-service", "version", "1.2.3", "environment", "production").Info("服务启动")
 }

@@ -3,6 +3,8 @@ package tools
 import (
 	"context"
 
+	"PingCodeMcp/internal/config"
+
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -28,11 +30,11 @@ func RegisterTool(mcpServer *server.MCPServer, tool MCPTool) {
 }
 
 // RegisterAllTools 注册所有工具到MCP服务器
-func RegisterAllTools(mcpServer *server.MCPServer) {
+func RegisterAllTools(mcpServer *server.MCPServer, cfg *config.Config) {
 	tools := []MCPTool{
-		NewIpSearchTool(),
-		NewUserInfoTool(),
-		NewAuthenticatedRequestTool(),
+		NewIpSearchTool(cfg),
+		NewUserInfoTool(cfg),
+		NewAuthenticatedRequestTool(cfg),
 	}
 
 	for _, tool := range tools {

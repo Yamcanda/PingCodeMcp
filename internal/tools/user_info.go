@@ -8,14 +8,11 @@ import (
 	"time"
 
 	"PingCodeMcp/internal/auth"
+	"PingCodeMcp/internal/config"
 	"PingCodeMcp/internal/utils"
 	"PingCodeMcp/pkg/logger"
 
 	"github.com/mark3labs/mcp-go/mcp"
-)
-
-const (
-	userInfoURL = "https://open.pingcode.com/v1/myself"
 )
 
 type userInfoResponse struct {
@@ -33,13 +30,15 @@ type userInfoResponse struct {
 type UserInfoTool struct {
 	name        string
 	description string
+	config      *config.Config
 }
 
 // NewUserInfoTool 创建用户信息工具实例
-func NewUserInfoTool() MCPTool {
+func NewUserInfoTool(cfg *config.Config) MCPTool {
 	return &UserInfoTool{
 		name:        "get_user_info",
 		description: "Get current user basic information from PingCode",
+		config:      cfg,
 	}
 }
 
@@ -111,21 +110,30 @@ func (t *UserInfoTool) doUserInfoRequest(ctx context.Context, token string, log 
 		"Content-Type":  "application/json",
 	}
 
-	log.With("url", userInfoURL, "method", "GET").Debug("发起用户信息API请求")
+	// 从配置中获取API URL
+	apiURL := t.config.API.UserInfo.URL
 
-	body, _, err := utils.DoGet(ctx, userInfoURL, headers, nil)
+	log.With("url", apiURL, "method", "GET").Debug("发起用户信息API请求")
+
+	// 创建带超时的上下文
+	timeoutCtx, cancel := context.WithTimeout(ctx, t.config.API.UserInfo.Timeout)
+	defer cancel()
+
+	body, _, err := utils.DoGet(timeoutCtx, apiURL, headers, nil)
 	if err != nil {
-		log.With("url", userInfoURL, "success", false, "error", err.Error()).Error("HTTP请求失败")
+		log.With("url", apiURL, "success", false, "error", err.Error()).Error("HTTP请求失败")
 		return "", err
 	}
 
-	log.With("url", userInfoURL, "response_size_bytes", len(body), "success", true).Debug("用户信息API请求成功")
+	log.With("url", apiURL, "response_size_bytes", len(body), "success", true).Debug("用户信息API请求成功")
 
 	return string(body), nil
 }
 
 // HandleUserInfoTool 保持向后兼容的函数
 func HandleUserInfoTool(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	tool := NewUserInfoTool()
+	// 使用默认配置创建工具实例
+	cfg := config.Load()
+	tool := NewUserInfoTool(cfg)
 	return tool.Handle(ctx, request)
 }
