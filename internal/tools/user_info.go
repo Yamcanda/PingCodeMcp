@@ -67,20 +67,14 @@ func (t *UserInfoTool) Handle(ctx context.Context, request mcp.CallToolRequest) 
 	defer log.Sync()
 
 	// 创建带有请求上下文的logger
-	requestLogger := log.With(
-		"tool", "get_user_info",
-		"request_id", fmt.Sprintf("user_%d", time.Now().UnixNano()),
-	)
+	requestLogger := log.With("tool", "get_user_info", "request_id", fmt.Sprintf("user_%d", time.Now().UnixNano()))
 
 	requestLogger.Info("开始获取用户信息")
 
 	// 从context中获取authkey
 	token, err := auth.TokenFromContext(ctx)
 	if err != nil {
-		requestLogger.With(
-			"success", false,
-			"error", "missing_token",
-		).Error("获取用户信息失败：缺少认证令牌")
+		requestLogger.With("success", false, "error", "missing_token").Error("获取用户信息失败：缺少认证令牌")
 		return nil, fmt.Errorf("missing or empty authorization token: %v", err)
 	}
 
@@ -91,47 +85,20 @@ func (t *UserInfoTool) Handle(ctx context.Context, request mcp.CallToolRequest) 
 
 	respStr, err := t.doUserInfoRequest(ctx, token, requestLogger)
 	if err != nil {
-		requestLogger.With(
-			"success", false,
-			"error", err.Error(),
-		).Error("用户信息API调用失败")
+		requestLogger.With("success", false, "error", err.Error()).Error("用户信息API调用失败")
 		return nil, fmt.Errorf("failed to get user info: %v", err)
 	}
 
 	var resp userInfoResponse
 	if err := json.Unmarshal([]byte(respStr), &resp); err != nil {
-		requestLogger.With(
-			"success", false,
-			"error", "json_parse_failed",
-		).Error("解析用户信息响应失败")
+		requestLogger.With("success", false, "error", "json_parse_failed").Error("解析用户信息响应失败")
 		return nil, fmt.Errorf("failed to parse response: %v", err)
 	}
 
 	// 格式化返回结果
-	result := fmt.Sprintf(`用户基本信息:
-		ID: %s
-		姓名: %s
-		邮箱: %s
-		电话: %s
-		状态: %s
-		角色: %s
-		部门: %s
-		头像: %s`,
-		resp.ID,
-		resp.Name,
-		resp.Email,
-		resp.Phone,
-		resp.Status,
-		resp.Role,
-		resp.Department,
-		resp.Avatar,
-	)
+	result := fmt.Sprintf(`用户基本信息:ID: %s 姓名: %s 邮箱: %s 电话: %s 状态: %s 角色: %s 部门: %s 头像: %s`, resp.ID, resp.Name, resp.Email, resp.Phone, resp.Status, resp.Role, resp.Department, resp.Avatar)
 
-	requestLogger.With(
-		"success", true,
-		"user_id", resp.ID,
-		"user_name", resp.Name,
-	).Info("用户信息获取成功")
+	requestLogger.With("success", true, "user_id", resp.ID, "user_name", resp.Name).Info("用户信息获取成功")
 
 	return mcp.NewToolResultText(result), nil
 }
@@ -144,26 +111,15 @@ func (t *UserInfoTool) doUserInfoRequest(ctx context.Context, token string, log 
 		"Content-Type":  "application/json",
 	}
 
-	log.With(
-		"url", userInfoURL,
-		"method", "GET",
-	).Debug("发起用户信息API请求")
+	log.With("url", userInfoURL, "method", "GET").Debug("发起用户信息API请求")
 
 	body, _, err := utils.DoGet(ctx, userInfoURL, headers, nil)
 	if err != nil {
-		log.With(
-			"url", userInfoURL,
-			"success", false,
-			"error", err.Error(),
-		).Error("HTTP请求失败")
+		log.With("url", userInfoURL, "success", false, "error", err.Error()).Error("HTTP请求失败")
 		return "", err
 	}
 
-	log.With(
-		"url", userInfoURL,
-		"response_size_bytes", len(body),
-		"success", true,
-	).Debug("用户信息API请求成功")
+	log.With("url", userInfoURL, "response_size_bytes", len(body), "success", true).Debug("用户信息API请求成功")
 
 	return string(body), nil
 }

@@ -1,0 +1,327 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+---
+name: "PingCodeMcp Go Project Rules"
+description: "Go语言MCP服务器项目开发规范"
+version: "1.0.0"
+language: "go"
+framework: "mcp-go"
+author: "PingCode Team"
+created: "2025-05-27"
+updated: "2025-05-27"
+tags: ["golang", "mcp", "server", "tools", "logging"]
+rules:
+  - "go-standards"
+  - "single-line-logging"
+  - "interface-driven"
+  - "error-handling"
+  - "performance"
+---
+
+# Cursor Rules for PingCodeMcp Go Project
+
+## 🎯 项目概述
+这是一个基于 Go 语言的 MCP (Model Context Protocol) 服务器项目，提供 IP 查询、用户信息获取等工具功能。
+
+## 📋 Go 语言代码规范
+
+### 1. 基本规范
+- 严格遵循 Go 官方代码规范 (gofmt, golint, go vet)
+- 使用 Go modules 进行依赖管理
+- 包名使用小写字母，不使用下划线或驼峰
+- 文件名使用小写字母和下划线分隔
+
+### 2. 命名规范
+```go
+// ✅ 正确的命名
+type UserInfoTool struct {
+    name        string
+    description string
+}
+
+func NewUserInfoTool() MCPTool {
+    return &UserInfoTool{}
+}
+
+// ❌ 错误的命名
+type userinfo_tool struct {}
+func new_user_info_tool() {}
+```
+
+### 3. 接口设计
+- 所有工具必须实现 `MCPTool` 接口
+- 接口方法名使用大写字母开头 (公开方法)
+- 私有方法使用小写字母开头
+
+### 4. 错误处理
+```go
+// ✅ 正确的错误处理
+if err != nil {
+    log.With("error", err.Error()).Error("操作失败")
+    return nil, fmt.Errorf("failed to process: %w", err)
+}
+
+// ❌ 错误的错误处理
+if err != nil {
+    panic(err) // 不要使用 panic
+}
+```
+
+### 5. 结构体定义
+```go
+// ✅ 正确的结构体定义
+type IpSearchTool struct {
+    name        string
+    description string
+}
+
+// ✅ 正确的构造函数
+func NewIpSearchTool() MCPTool {
+    return &IpSearchTool{
+        name:        "ip_search",
+        description: "Search IP location info",
+    }
+}
+```
+
+## 📝 日志记录规范
+
+### 1. 日志格式要求
+**重要：所有日志记录必须写在一行，不允许换行**
+
+```go
+// ✅ 正确的日志记录 - 单行格式
+log.With("user_id", 123, "action", "login", "ip", "192.168.1.1").Info("用户登录成功")
+
+log.With("duration_ms", 150, "success", true, "result", "中国 上海市").Info("IP查询完成")
+
+log.With("error", err.Error(), "url", apiURL, "method", "GET").Error("API请求失败")
+
+// ❌ 错误的日志记录 - 多行格式
+log.With(
+    "user_id", 123,
+    "action", "login",
+    "ip", "192.168.1.1",
+).Info("用户登录成功")
+```
+
+### 2. 日志级别使用
+```go
+// Debug - 详细调试信息
+log.With("url", apiURL, "method", "GET").Debug("发起API请求")
+
+// Info - 一般信息
+log.With("tool", "ip_search", "ip", ip).Info("开始查询IP地理位置")
+
+// Warn - 警告信息
+log.With("status", resp.Status, "expected", "Success").Warn("API返回非成功状态")
+
+// Error - 错误信息
+log.With("error", err.Error(), "operation", "parse_json").Error("解析响应失败")
+
+// Fatal - 致命错误 (谨慎使用)
+log.With("error", err.Error()).Fatal("服务器启动失败")
+```
+
+### 3. 结构化日志字段
+```go
+// 必需字段
+log.With("tool", toolName, "request_id", requestID).Info("开始处理请求")
+
+// 性能监控字段
+log.With("duration_ms", duration, "success", true).Info("操作完成")
+
+// 错误处理字段
+log.With("error", err.Error(), "operation", "api_call").Error("操作失败")
+
+// 业务字段
+log.With("user_id", userID, "ip", clientIP, "action", action).Info("用户操作")
+```
+
+## 🏗️ 工具开发模板
+
+### 1. 工具结构模板
+```go
+package tools
+
+import (
+    "context"
+    "fmt"
+    "time"
+    "github.com/mark3labs/mcp-go/mcp"
+    "PingCodeMcp/pkg/logger"
+)
+
+// YourTool 工具结构体
+type YourTool struct {
+    name        string
+    description string
+}
+
+// NewYourTool 创建工具实例
+func NewYourTool() MCPTool {
+    return &YourTool{
+        name:        "your_tool",
+        description: "Your tool description",
+    }
+}
+
+// GetName 返回工具名称
+func (t *YourTool) GetName() string {
+    return t.name
+}
+
+// GetDescription 返回工具描述
+func (t *YourTool) GetDescription() string {
+    return t.description
+}
+
+// GetToolDefinition 返回工具定义
+func (t *YourTool) GetToolDefinition() mcp.Tool {
+    return mcp.NewTool(t.name, mcp.WithDescription(t.description))
+}
+
+// Handle 处理工具调用请求
+func (t *YourTool) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+    log := logger.New()
+    defer log.Sync()
+
+    requestLogger := log.With("tool", t.name, "request_id", fmt.Sprintf("req_%d", time.Now().UnixNano()))
+    requestLogger.Info("开始处理工具请求")
+
+    // 业务逻辑处理
+
+    requestLogger.With("success", true).Info("工具请求处理成功")
+    return mcp.NewToolResultText("result"), nil
+}
+```
+
+### 2. 日志记录模板
+```go
+// 请求开始
+log.With("tool", toolName, "request_id", requestID).Info("开始处理请求")
+
+// 参数验证
+log.With("param", paramName, "value", paramValue).Debug("参数验证通过")
+
+// API调用
+log.With("url", apiURL, "method", httpMethod).Debug("发起API请求")
+
+// 成功响应
+log.With("duration_ms", duration, "success", true, "result_size", len(result)).Info("请求处理成功")
+
+// 错误处理
+log.With("error", err.Error(), "operation", operationName, "success", false).Error("操作失败")
+```
+
+## 🔧 代码质量要求
+
+### 1. 函数设计
+- 函数名使用驼峰命名法
+- 公开函数首字母大写，私有函数首字母小写
+- 函数参数不超过 5 个，超过时使用结构体
+- 函数长度不超过 50 行
+
+### 2. 注释规范
+```go
+// GetUserInfo 获取用户基本信息
+// 参数:
+//   - ctx: 上下文对象，包含认证信息
+//   - request: MCP工具调用请求
+// 返回:
+//   - *mcp.CallToolResult: 工具执行结果
+//   - error: 错误信息
+func (t *UserInfoTool) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+    // 实现代码
+}
+```
+
+### 3. 导入规范
+```go
+import (
+    // 标准库
+    "context"
+    "fmt"
+    "time"
+
+    // 第三方库
+    "github.com/mark3labs/mcp-go/mcp"
+
+    // 项目内部包
+    "PingCodeMcp/internal/auth"
+    "PingCodeMcp/pkg/logger"
+)
+```
+
+## 🚨 禁止事项
+
+1. **不要使用 panic()** - 使用适当的错误处理
+2. **不要忽略错误** - 所有错误都必须处理
+3. **不要使用全局变量** - 使用依赖注入
+4. **不要在日志中记录敏感信息** - 如密码、token等
+5. **不要使用多行日志记录** - 所有日志必须单行
+
+## 📊 性能要求
+
+1. **日志性能** - 使用 zap logger，避免频繁的字符串拼接
+2. **内存管理** - 及时释放资源，使用 defer 语句
+3. **并发安全** - 工具实现必须是线程安全的
+
+## 🧪 测试要求
+
+1. 每个工具都应该有对应的测试文件
+2. 测试覆盖率不低于 80%
+3. 测试文件命名: `*_test.go`
+
+## 📁 项目结构
+
+```
+PingCodeMcp/
+├── cmd/
+│   └── server/
+│       └── main.go              # 服务器入口文件
+├── internal/
+│   ├── auth/                    # 认证相关
+│   ├── config/                  # 配置管理
+│   ├── models/                  # 数据模型
+│   ├── server/                  # MCP服务器实现
+│   ├── tools/                   # 工具实现
+│   │   ├── interface.go         # 工具接口定义
+│   │   ├── ip_search.go         # IP查询工具
+│   │   ├── user_info.go         # 用户信息工具
+│   │   └── authenticated_request.go # 认证请求工具
+│   └── utils/                   # 工具函数
+├── pkg/
+│   └── logger/                  # 日志包
+├── logs/                        # 日志文件目录
+├── docs/                        # 项目文档
+├── .cursor/
+│   └── rules/
+│       └── general.mdc          # Cursor规则文件
+├── go.mod                       # Go模块文件
+├── go.sum                       # Go依赖校验文件
+├── Makefile                     # 构建脚本
+├── Dockerfile                   # Docker构建文件
+└── README.md                    # 项目说明
+```
+
+## 🔄 工作流程
+
+### 添加新工具的步骤
+1. 在 `internal/tools/` 创建新工具文件
+2. 实现 `MCPTool` 接口的所有方法
+3. 在 `tool_interface.go` 的 `RegisterAllTools` 函数中注册
+4. 编写单元测试
+5. 更新文档
+
+### 代码提交规范
+- 提交信息使用中文
+- 格式: `类型: 简短描述`
+- 类型: feat(新功能), fix(修复), docs(文档), style(格式), refactor(重构), test(测试)
+
+遵循这些规则将确保代码质量、可维护性和项目的长期发展。
+
+
