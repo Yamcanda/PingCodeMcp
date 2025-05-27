@@ -16,14 +16,15 @@ import (
 )
 
 type userInfoResponse struct {
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	Email      string `json:"email"`
-	Avatar     string `json:"avatar"`
-	Phone      string `json:"phone"`
-	Status     string `json:"status"`
-	Role       string `json:"role"`
-	Department string `json:"department"`
+	ID          string `json:"id"`
+	DisplayName string `json:"display_name"`
+	Name        string `json:"name"`
+	Email       string `json:"email"`
+	Avatar      string `json:"avatar"`
+	Phone       string `json:"phone"`
+	Status      string `json:"status"`
+	Role        string `json:"role"`
+	Department  string `json:"department"`
 }
 
 // UserInfoTool 用户信息工具结构体
