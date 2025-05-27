@@ -16,9 +16,9 @@ func main() {
 	log := logger.New()
 	// 确保在程序退出前刷新日志缓冲区
 	defer log.Sync()
-
 	// 创建服务器
 	s := server.NewMCPServer()
+	// 获取配置
 	cfg := s.GetConfig()
 
 	// 启动 HTTP 服务器
