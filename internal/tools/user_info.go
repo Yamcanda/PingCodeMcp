@@ -20,8 +20,8 @@ type userInfoResponse struct {
 	DisplayName string `json:"display_name"`
 	Name        string `json:"name"`
 	Email       string `json:"email"`
-	Avatar      string `json:"avatar"`
-	Phone       string `json:"phone"`
+	Url         string `json:"url"`
+	Mobile      string `json:"mobile"`
 	Status      string `json:"status"`
 	Role        string `json:"role"`
 	Department  string `json:"department"`
@@ -96,9 +96,9 @@ func (t *UserInfoTool) Handle(ctx context.Context, request mcp.CallToolRequest) 
 	}
 
 	// 格式化返回结果
-	result := fmt.Sprintf(`用户基本信息:ID: %s 姓名: %s 邮箱: %s 电话: %s 状态: %s 角色: %s 部门: %s 头像: %s`, resp.ID, resp.Name, resp.Email, resp.Phone, resp.Status, resp.Role, resp.Department, resp.Avatar)
+	result := fmt.Sprintf(`用户基本信息:ID: %s 姓名: %s 邮箱: %s 电话: %s 状态: %s 角色: %s 部门: %s 头像: %s`, resp.ID, resp.DisplayName, resp.Email, resp.Mobile, resp.Status, resp.Role, resp.Department, resp.Url)
 
-	requestLogger.With("success", true, "user_id", resp.ID, "user_name", resp.Name).Info("用户信息获取成功")
+	requestLogger.With("success", true, "user_id", resp.ID, "display_name", resp.DisplayName).Info("用户信息获取成功")
 
 	return mcp.NewToolResultText(result), nil
 }
