@@ -400,7 +400,7 @@ func (c *Config) GetLogLevel() string {
 	return c.Logging.Level
 }
 
-// 为了向后兼容，保留原有的字段
+// LegacyConfig 为了向后兼容，保留原有的字段
 type LegacyConfig struct {
 	ServerName    string
 	ServerVersion string

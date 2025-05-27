@@ -13,6 +13,7 @@ type MCPServer struct {
 	config *config.Config
 }
 
+// NewMCPServer 创建一个新的MCPServer实例
 func NewMCPServer() *MCPServer {
 	cfg := config.Load()
 
@@ -33,12 +34,14 @@ func NewMCPServer() *MCPServer {
 	}
 }
 
+// ServeHTTP 启动HTTP服务
 func (s *MCPServer) ServeHTTP() *server.StreamableHTTPServer {
 	return server.NewStreamableHTTPServer(s.server,
 		server.WithHTTPContextFunc(auth.AuthFromRequest),
 	)
 }
 
+// GetConfig 获取配置
 func (s *MCPServer) GetConfig() *config.Config {
 	return s.config
 }
