@@ -37,7 +37,8 @@ func New() *Logger {
 	config.EncoderConfig.CallerKey = "caller"
 	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 
-	logger, err := config.Build()
+	// 关键配置：增加调用栈跳过层数，显示真实调用位置
+	logger, err := config.Build(zap.AddCallerSkip(1))
 	if err != nil {
 		panic("Failed to initialize logger: " + err.Error())
 	}
@@ -66,7 +67,8 @@ func NewProduction() *Logger {
 	config.OutputPaths = []string{"stdout", logFile}
 	config.ErrorOutputPaths = []string{"stderr", logFile}
 
-	logger, err := config.Build()
+	// 关键配置：增加调用栈跳过层数，显示真实调用位置
+	logger, err := config.Build(zap.AddCallerSkip(1))
 	if err != nil {
 		panic("Failed to initialize production logger: " + err.Error())
 	}
@@ -95,7 +97,8 @@ func NewFileOnly() *Logger {
 	config.OutputPaths = []string{logFile}
 	config.ErrorOutputPaths = []string{logFile}
 
-	logger, err := config.Build()
+	// 关键配置：增加调用栈跳过层数，显示真实调用位置
+	logger, err := config.Build(zap.AddCallerSkip(1))
 	if err != nil {
 		panic("Failed to initialize file-only logger: " + err.Error())
 	}
@@ -124,7 +127,8 @@ func NewWithRotation() *Logger {
 	config.OutputPaths = []string{"stdout", logFile}
 	config.ErrorOutputPaths = []string{"stderr", logFile}
 
-	logger, err := config.Build()
+	// 关键配置：增加调用栈跳过层数，显示真实调用位置
+	logger, err := config.Build(zap.AddCallerSkip(1))
 	if err != nil {
 		panic("Failed to initialize rotation logger: " + err.Error())
 	}

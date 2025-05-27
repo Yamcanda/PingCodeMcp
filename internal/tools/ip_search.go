@@ -26,8 +26,43 @@ type ipSearchResponse struct {
 	} `json:"data"`
 }
 
-// HandleIpSearchTool MCP工具：根据IP查询地理位置
-func HandleIpSearchTool(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+// IpSearchTool IP查询工具结构体
+type IpSearchTool struct {
+	name        string
+	description string
+}
+
+// NewIpSearchTool 创建IP查询工具实例
+func NewIpSearchTool() MCPTool {
+	return &IpSearchTool{
+		name:        "ip_search",
+		description: "Search IP location info",
+	}
+}
+
+// GetName 返回工具名称
+func (t *IpSearchTool) GetName() string {
+	return t.name
+}
+
+// GetDescription 返回工具描述
+func (t *IpSearchTool) GetDescription() string {
+	return t.description
+}
+
+// GetToolDefinition 返回工具定义
+func (t *IpSearchTool) GetToolDefinition() mcp.Tool {
+	return mcp.NewTool(t.name,
+		mcp.WithDescription(t.description),
+		mcp.WithString("ip",
+			mcp.Description("IP address to search"),
+			mcp.Required(),
+		),
+	)
+}
+
+// Handle 处理IP查询请求
+func (t *IpSearchTool) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// 创建logger实例
 	log := logger.New()
 	defer log.Sync()
@@ -55,7 +90,7 @@ func HandleIpSearchTool(ctx context.Context, request mcp.CallToolRequest) (*mcp.
 	requestLogger.Info("开始查询IP地理位置")
 
 	address := unknownAddr
-	respStr, err := doIpSearch(ctx, ip, requestLogger)
+	respStr, err := t.doIpSearch(ctx, ip, requestLogger)
 	if err != nil {
 		requestLogger.With(
 			"duration_ms", time.Since(startTime).Milliseconds(),
@@ -102,7 +137,8 @@ func HandleIpSearchTool(ctx context.Context, request mcp.CallToolRequest) (*mcp.
 	return mcp.NewToolResultText(address), nil
 }
 
-func doIpSearch(ctx context.Context, ip string, log *logger.Logger) (string, error) {
+// doIpSearch 执行IP查询API调用
+func (t *IpSearchTool) doIpSearch(ctx context.Context, ip string, log *logger.Logger) (string, error) {
 	query := map[string]string{"ip": ip}
 	headers := map[string]string{"Accept": "application/json"}
 
@@ -143,4 +179,10 @@ func truncateString(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "..."
+}
+
+// HandleIpSearchTool 保持向后兼容的函数
+func HandleIpSearchTool(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tool := NewIpSearchTool()
+	return tool.Handle(ctx, request)
 }
