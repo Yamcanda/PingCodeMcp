@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -64,20 +65,20 @@ func (t *AuthenticatedRequestTool) Handle(ctx context.Context, request mcp.CallT
 	message, ok := request.GetArguments()["message"].(string)
 	if !ok {
 		requestLogger.With("success", false, "error", "missing_message").Error("认证请求失败：缺少消息参数")
-		return nil, fmt.Errorf("missing message")
+		return mcp.NewToolResultError(errors.New("missing or empty message").Error()), nil
 	}
 
 	token, err := auth.TokenFromContext(ctx)
 	if err != nil {
 		requestLogger.With("success", false, "error", "missing_token").Error("认证请求失败：缺少认证令牌")
-		return nil, fmt.Errorf("missing token: %v", err)
+		return mcp.NewToolResultError(err.Error()), nil
 	}
 
 	// Now our tool can make a request with the token, irrespective of where it came from.
 	resp, err := t.makeRequest(ctx, message, token, requestLogger)
 	if err != nil {
 		requestLogger.With("success", false, "error", err.Error()).Error("认证请求执行失败")
-		return nil, err
+		return mcp.NewToolResultError(err.Error()), nil
 	}
 
 	requestLogger.With("success", true, "message", message).Info("认证请求执行成功")

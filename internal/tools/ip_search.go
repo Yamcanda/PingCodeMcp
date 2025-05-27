@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -75,7 +76,7 @@ func (t *IpSearchTool) Handle(ctx context.Context, request mcp.CallToolRequest) 
 	ip, ok := request.GetArguments()["ip"].(string)
 	if !ok || strings.TrimSpace(ip) == "" {
 		log.With("duration_ms", time.Since(startTime).Milliseconds(), "success", false, "error", "missing_ip_parameter").Error("IP查询失败：缺少或空的IP参数")
-		return nil, fmt.Errorf("missing or empty ip")
+		return mcp.NewToolResultError(errors.New("missing or empty ip").Error()), nil
 	}
 
 	// 创建带有请求上下文的logger

@@ -75,7 +75,7 @@ func (t *UserInfoTool) Handle(ctx context.Context, request mcp.CallToolRequest) 
 	token, err := auth.TokenFromContext(ctx)
 	if err != nil {
 		requestLogger.With("success", false, "error", "missing_token").Error("获取用户信息失败：缺少认证令牌")
-		return nil, fmt.Errorf("missing or empty authorization token: %v", err)
+		return mcp.NewToolResultError(err.Error()), nil
 	}
 
 	// 确保token格式正确
@@ -86,13 +86,13 @@ func (t *UserInfoTool) Handle(ctx context.Context, request mcp.CallToolRequest) 
 	respStr, err := t.doUserInfoRequest(ctx, token, requestLogger)
 	if err != nil {
 		requestLogger.With("success", false, "error", err.Error()).Error("用户信息API调用失败")
-		return nil, fmt.Errorf("failed to get user info: %v", err)
+		return mcp.NewToolResultError(err.Error()), nil
 	}
 
 	var resp userInfoResponse
 	if err := json.Unmarshal([]byte(respStr), &resp); err != nil {
 		requestLogger.With("success", false, "error", "json_parse_failed").Error("解析用户信息响应失败")
-		return nil, fmt.Errorf("failed to parse response: %v", err)
+		return mcp.NewToolResultError(err.Error()), nil
 	}
 
 	// 格式化返回结果
