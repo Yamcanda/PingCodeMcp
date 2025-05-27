@@ -46,6 +46,7 @@ func (s *MCPServer) GetConfig() *config.Config {
 
 // registerTools 注册所有可用的工具
 func registerTools(mcpServer *server.MCPServer) {
+
 	// 注册认证请求工具
 	mcpServer.AddTool(mcp.NewTool("make_authenticated_request",
 		mcp.WithDescription("Makes an authenticated request"),
