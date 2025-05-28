@@ -12,24 +12,30 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 
 	"PingCodeMcp/internal/auth"
-	"PingCodeMcp/internal/config"
 	"PingCodeMcp/internal/models"
 	"PingCodeMcp/pkg/logger"
 )
+
+// 注册工具
+func init() {
+	toolsFns = append(toolsFns, func() *[]MCPTool {
+		return &[]MCPTool{
+			NewAuthenticatedRequestTool(),
+		}
+	})
+}
 
 // AuthenticatedRequestTool 认证请求工具结构体
 type AuthenticatedRequestTool struct {
 	name        string
 	description string
-	config      *config.Config
 }
 
 // NewAuthenticatedRequestTool 创建认证请求工具实例
-func NewAuthenticatedRequestTool(cfg *config.Config) MCPTool {
+func NewAuthenticatedRequestTool() MCPTool {
 	return &AuthenticatedRequestTool{
 		name:        "make_authenticated_request",
 		description: "Makes an authenticated request",
-		config:      cfg,
 	}
 }
 
@@ -122,12 +128,4 @@ func (t *AuthenticatedRequestTool) makeRequest(ctx context.Context, message, tok
 	log.With("success", true, "response_size_bytes", len(body), "status_code", resp.StatusCode).Debug("认证请求执行成功")
 
 	return r, nil
-}
-
-// HandleMakeAuthenticatedRequestTool 保持向后兼容的函数
-func HandleMakeAuthenticatedRequestTool(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	// 使用默认配置创建工具实例
-	cfg := config.Load()
-	tool := NewAuthenticatedRequestTool(cfg)
-	return tool.Handle(ctx, request)
 }

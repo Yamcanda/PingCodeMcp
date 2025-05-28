@@ -9,12 +9,28 @@ import (
 	"time"
 
 	"PingCodeMcp/internal/auth"
-	"PingCodeMcp/internal/config"
 	"PingCodeMcp/internal/utils"
 	"PingCodeMcp/pkg/logger"
 
 	"github.com/mark3labs/mcp-go/mcp"
 )
+
+const (
+	// 企业成员服务API地址
+	enterpriseUsersAPIURL = baseUrl + "/v1/directory/users"
+	// API请求超时时间
+	enterpriseUsersTimeout = 15 * time.Second
+)
+
+// 注册工具
+func init() {
+	toolsFns = append(toolsFns, func() *[]MCPTool {
+		return &[]MCPTool{
+			NewEnterpriseUsersTool(),
+			NewCreateEnterpriseUserTool(),
+		}
+	})
+}
 
 // EnterpriseUser 企业成员信息结构体
 type EnterpriseUser struct {
@@ -43,15 +59,13 @@ type EnterpriseUsersResponse struct {
 type EnterpriseUsersTool struct {
 	name        string
 	description string
-	config      *config.Config
 }
 
 // NewEnterpriseUsersTool 创建企业成员列表工具实例
-func NewEnterpriseUsersTool(cfg *config.Config) MCPTool {
+func NewEnterpriseUsersTool() MCPTool {
 	return &EnterpriseUsersTool{
 		name:        "get_enterprise_users",
 		description: "Get enterprise users list from PingCode",
-		config:      cfg,
 	}
 }
 
@@ -220,22 +234,19 @@ func (t *EnterpriseUsersTool) doEnterpriseUsersRequest(ctx context.Context, toke
 		"Content-Type":  "application/json",
 	}
 
-	// 从配置中获取API URL
-	apiURL := t.config.API.EnterpriseUsers.URL
-
-	log.With("url", apiURL, "method", "GET", "params", params).Debug("发起企业成员列表API请求")
+	log.With("url", enterpriseUsersAPIURL, "method", "GET", "params", params).Debug("发起企业成员列表API请求")
 
 	// 创建带超时的上下文
-	timeoutCtx, cancel := context.WithTimeout(ctx, t.config.API.EnterpriseUsers.Timeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, enterpriseUsersTimeout)
 	defer cancel()
 
-	body, _, err := utils.DoGet(timeoutCtx, apiURL, headers, params)
+	body, _, err := utils.DoGet(timeoutCtx, enterpriseUsersAPIURL, headers, params)
 	if err != nil {
-		log.With("url", apiURL, "success", false, "error", err.Error()).Error("HTTP请求失败")
+		log.With("url", enterpriseUsersAPIURL, "success", false, "error", err.Error()).Error("HTTP请求失败")
 		return "", err
 	}
 
-	log.With("url", apiURL, "response_size_bytes", len(body), "success", true).Debug("企业成员列表API请求成功")
+	log.With("url", enterpriseUsersAPIURL, "response_size_bytes", len(body), "success", true).Debug("企业成员列表API请求成功")
 
 	return string(body), nil
 }
@@ -285,14 +296,6 @@ func (t *EnterpriseUsersTool) formatResponse(resp EnterpriseUsersResponse) strin
 	return result.String()
 }
 
-// HandleEnterpriseUsersTool 保持向后兼容的函数
-func HandleEnterpriseUsersTool(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	// 使用默认配置创建工具实例
-	cfg := config.Load()
-	tool := NewEnterpriseUsersTool(cfg)
-	return tool.Handle(ctx, request)
-}
-
 // CreateEnterpriseUserRequest 创建企业成员请求结构体
 type CreateEnterpriseUserRequest struct {
 	Name           string `json:"name"`
@@ -324,15 +327,13 @@ type CreateEnterpriseUserResponse struct {
 type CreateEnterpriseUserTool struct {
 	name        string
 	description string
-	config      *config.Config
 }
 
 // NewCreateEnterpriseUserTool 创建企业成员工具实例
-func NewCreateEnterpriseUserTool(cfg *config.Config) MCPTool {
+func NewCreateEnterpriseUserTool() MCPTool {
 	return &CreateEnterpriseUserTool{
 		name:        "create_enterprise_user",
 		description: "Create a new enterprise user in PingCode",
-		config:      cfg,
 	}
 }
 
@@ -516,13 +517,10 @@ func (t *CreateEnterpriseUserTool) doCreateUserRequest(ctx context.Context, toke
 		"Content-Type":  "application/json",
 	}
 
-	// 从配置中获取API URL
-	apiURL := t.config.API.EnterpriseUsers.URL
-
-	log.With("url", apiURL, "method", "POST", "user_name", userRequest.Name).Debug("发起创建企业成员API请求")
+	log.With("url", enterpriseUsersAPIURL, "method", "POST", "user_name", userRequest.Name).Debug("发起创建企业成员API请求")
 
 	// 创建带超时的上下文
-	timeoutCtx, cancel := context.WithTimeout(ctx, t.config.API.EnterpriseUsers.Timeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, enterpriseUsersTimeout)
 	defer cancel()
 
 	// 序列化请求体
@@ -532,13 +530,13 @@ func (t *CreateEnterpriseUserTool) doCreateUserRequest(ctx context.Context, toke
 		return "", fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
-	body, _, err := utils.DoPostJSON(timeoutCtx, apiURL, headers, requestBody)
+	body, _, err := utils.DoPostJSON(timeoutCtx, enterpriseUsersAPIURL, headers, requestBody)
 	if err != nil {
-		log.With("url", apiURL, "success", false, "error", err.Error()).Error("HTTP请求失败")
+		log.With("url", enterpriseUsersAPIURL, "success", false, "error", err.Error()).Error("HTTP请求失败")
 		return "", err
 	}
 
-	log.With("url", apiURL, "response_size_bytes", len(body), "success", true).Debug("创建企业成员API请求成功")
+	log.With("url", enterpriseUsersAPIURL, "response_size_bytes", len(body), "success", true).Debug("创建企业成员API请求成功")
 
 	return string(body), nil
 }
@@ -576,12 +574,4 @@ func (t *CreateEnterpriseUserTool) formatCreateUserResponse(resp CreateEnterpris
 	}
 
 	return result.String()
-}
-
-// HandleCreateEnterpriseUserTool 保持向后兼容的函数
-func HandleCreateEnterpriseUserTool(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	// 使用默认配置创建工具实例
-	cfg := config.Load()
-	tool := NewCreateEnterpriseUserTool(cfg)
-	return tool.Handle(ctx, request)
 }

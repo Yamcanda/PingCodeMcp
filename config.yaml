@@ -9,23 +9,16 @@ server:
   port: 8080
   host: "0.0.0.0"
 
-  # 超时配置
-  timeout:
-    read: 30s
-    write: 30s
-    idle: 60s
-    shutdown: 10s
-
 # 日志配置
 logging:
   level: "info"  # debug, info, warn, error, fatal
-  format: "json"  # json, console
+  format: "console"  # json, console
   output: "both"  # console, file, both
 
   # 文件日志配置
   file:
     path: "logs"
-    filename: "app.log"
+    filename: "PingCodeMcp.log"
     max_size: 100  # MB
     max_age: 7     # days
     max_backups: 10
@@ -35,46 +28,6 @@ logging:
   rotation:
     enabled: true
     daily: true
-
-# API 配置文件引用
-api_config_file: "api_config.yaml"
-
-# 性能配置
-performance:
-  # HTTP客户端配置
-  http_client:
-    max_idle_conns: 100
-    max_idle_conns_per_host: 10
-    idle_conn_timeout: 90s
-
-  # 并发配置
-  concurrency:
-    max_workers: 50
-    queue_size: 1000
-
-# 监控配置
-monitoring:
-  # 健康检查
-  health_check:
-    enabled: true
-    path: "/health"
-    interval: 30s
-
-  # 指标收集
-  metrics:
-    enabled: true
-    path: "/metrics"
-
-# 开发环境配置
-development:
-  debug: false
-  hot_reload: false
-  profiling: false
-
-# 生产环境配置
-production:
-  debug: false
-  profiling: false
 
 # 环境变量覆盖配置
 # 支持通过环境变量覆盖配置项

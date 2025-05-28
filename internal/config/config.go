@@ -5,41 +5,24 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"time"
 
 	"gopkg.in/yaml.v3"
 )
 
 // Config 应用程序配置结构体
 type Config struct {
-	Version       string            `yaml:"version"`
-	Server        ServerConfig      `yaml:"server"`
-	Logging       LoggingConfig     `yaml:"logging"`
-	APIConfigFile string            `yaml:"api_config_file"` // API配置文件路径
-	API           APIConfig         `yaml:"api,omitempty"`   // 可选：直接配置或从文件加载
-	Auth          AuthConfig        `yaml:"auth,omitempty"`  // 可选：直接配置或从文件加载
-	Performance   PerformanceConfig `yaml:"performance"`
-	Monitoring    MonitoringConfig  `yaml:"monitoring"`
-	Development   DevelopmentConfig `yaml:"development"`
-	Production    ProductionConfig  `yaml:"production"`
-	EnvOverride   EnvOverrideConfig `yaml:"env_override"`
+	Version     string            `yaml:"version"`
+	Server      ServerConfig      `yaml:"server"`
+	Logging     LoggingConfig     `yaml:"logging"`
+	EnvOverride EnvOverrideConfig `yaml:"env_override"`
 }
 
 // ServerConfig 服务器配置
 type ServerConfig struct {
-	Name    string        `yaml:"name"`
-	Version string        `yaml:"version"`
-	Port    int           `yaml:"port"`
-	Host    string        `yaml:"host"`
-	Timeout TimeoutConfig `yaml:"timeout"`
-}
-
-// TimeoutConfig 超时配置
-type TimeoutConfig struct {
-	Read     time.Duration `yaml:"read"`
-	Write    time.Duration `yaml:"write"`
-	Idle     time.Duration `yaml:"idle"`
-	Shutdown time.Duration `yaml:"shutdown"`
+	Name    string `yaml:"name"`
+	Version string `yaml:"version"`
+	Port    int    `yaml:"port"`
+	Host    string `yaml:"host"`
 }
 
 // LoggingConfig 日志配置
@@ -67,139 +50,15 @@ type RotationConfig struct {
 	Daily   bool `yaml:"daily"`
 }
 
-// APIConfig API配置
-type APIConfig struct {
-	IPSearch        IPSearchConfig        `yaml:"ip_search"`
-	UserInfo        UserInfoConfig        `yaml:"user_info"`
-	EnterpriseUsers EnterpriseUsersConfig `yaml:"enterprise_users"`
-}
-
-// IPSearchConfig IP查询服务配置
-type IPSearchConfig struct {
-	URL        string        `yaml:"url"`
-	Timeout    time.Duration `yaml:"timeout"`
-	RetryCount int           `yaml:"retry_count"`
-	RetryDelay time.Duration `yaml:"retry_delay"`
-}
-
-// UserInfoConfig 用户信息服务配置
-type UserInfoConfig struct {
-	URL        string        `yaml:"url"`
-	Timeout    time.Duration `yaml:"timeout"`
-	RetryCount int           `yaml:"retry_count"`
-	RetryDelay time.Duration `yaml:"retry_delay"`
-}
-
-// EnterpriseUsersConfig 企业成员列表服务配置
-type EnterpriseUsersConfig struct {
-	URL        string        `yaml:"url"`
-	Timeout    time.Duration `yaml:"timeout"`
-	RetryCount int           `yaml:"retry_count"`
-	RetryDelay time.Duration `yaml:"retry_delay"`
-}
-
-// AuthConfig 认证配置
-type AuthConfig struct {
-	Token   TokenConfig   `yaml:"token"`
-	Session SessionConfig `yaml:"session"`
-}
-
-// TokenConfig Token配置
-type TokenConfig struct {
-	HeaderName string `yaml:"header_name"`
-	Prefix     string `yaml:"prefix"`
-}
-
-// SessionConfig 会话配置
-type SessionConfig struct {
-	Timeout          time.Duration `yaml:"timeout"`
-	RefreshThreshold time.Duration `yaml:"refresh_threshold"`
-}
-
-// PerformanceConfig 性能配置
-type PerformanceConfig struct {
-	HTTPClient  HTTPClientConfig  `yaml:"http_client"`
-	Concurrency ConcurrencyConfig `yaml:"concurrency"`
-}
-
-// HTTPClientConfig HTTP客户端配置
-type HTTPClientConfig struct {
-	MaxIdleConns        int           `yaml:"max_idle_conns"`
-	MaxIdleConnsPerHost int           `yaml:"max_idle_conns_per_host"`
-	IdleConnTimeout     time.Duration `yaml:"idle_conn_timeout"`
-}
-
-// ConcurrencyConfig 并发配置
-type ConcurrencyConfig struct {
-	MaxWorkers int `yaml:"max_workers"`
-	QueueSize  int `yaml:"queue_size"`
-}
-
-// MonitoringConfig 监控配置
-type MonitoringConfig struct {
-	HealthCheck HealthCheckConfig `yaml:"health_check"`
-	Metrics     MetricsConfig     `yaml:"metrics"`
-}
-
-// HealthCheckConfig 健康检查配置
-type HealthCheckConfig struct {
-	Enabled  bool          `yaml:"enabled"`
-	Path     string        `yaml:"path"`
-	Interval time.Duration `yaml:"interval"`
-}
-
-// MetricsConfig 指标配置
-type MetricsConfig struct {
-	Enabled bool   `yaml:"enabled"`
-	Path    string `yaml:"path"`
-}
-
-// DevelopmentConfig 开发环境配置
-type DevelopmentConfig struct {
-	Debug     bool `yaml:"debug"`
-	HotReload bool `yaml:"hot_reload"`
-	Profiling bool `yaml:"profiling"`
-}
-
-// ProductionConfig 生产环境配置
-type ProductionConfig struct {
-	Debug     bool `yaml:"debug"`
-	Profiling bool `yaml:"profiling"`
-}
-
 // EnvOverrideConfig 环境变量覆盖配置
 type EnvOverrideConfig struct {
 	Enabled bool   `yaml:"enabled"`
 	Prefix  string `yaml:"prefix"`
 }
 
-// APIConfigFile API配置文件结构
-type APIConfigFile struct {
-	Version string     `yaml:"version"`
-	API     APIConfig  `yaml:"api"`
-	Auth    AuthConfig `yaml:"auth"`
-}
-
 // Load 加载配置文件
 func Load() *Config {
-	return LoadWithAPIConfig()
-}
-
-// LoadWithAPIConfig 加载主配置并合并 API 配置
-func LoadWithAPIConfig() *Config {
-	// 加载主配置
-	config := LoadFromFile("config.yaml")
-
-	// 检查是否指定了 API 配置文件
-	if config.APIConfigFile != "" {
-		if apiConfig, err := LoadAPIConfig(config.APIConfigFile); err == nil {
-			// 合并 API 配置
-			config.API = apiConfig.API
-			config.Auth = apiConfig.Auth
-		}
-	}
-
-	return config
+	return LoadFromFile("config.yaml")
 }
 
 // LoadFromFile 从指定文件加载配置
@@ -217,30 +76,6 @@ func LoadFromFile(filename string) *Config {
 	}
 
 	return config
-}
-
-// LoadAPIConfig 加载 API 配置文件
-func LoadAPIConfig(filename string) (*APIConfigFile, error) {
-	apiConfig := &APIConfigFile{}
-
-	// 查找配置文件
-	configPath := findConfigFile(filename)
-	if configPath == "" {
-		return nil, fmt.Errorf("API配置文件 %s 未找到", filename)
-	}
-
-	// 读取文件内容
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return nil, fmt.Errorf("读取API配置文件失败: %w", err)
-	}
-
-	// 解析YAML
-	if err := yaml.Unmarshal(data, apiConfig); err != nil {
-		return nil, fmt.Errorf("解析API配置YAML失败: %w", err)
-	}
-
-	return apiConfig, nil
 }
 
 // loadYAMLConfig 加载YAML配置文件
@@ -312,20 +147,7 @@ func applyEnvOverrides(config *Config) {
 	if val := os.Getenv(prefix + "LOGGING_OUTPUT"); val != "" {
 		config.Logging.Output = val
 	}
-	// API配置文件路径覆盖
-	if val := os.Getenv(prefix + "API_CONFIG_FILE"); val != "" {
-		config.APIConfigFile = val
-	}
-	// API配置覆盖
-	if val := os.Getenv(prefix + "API_IP_SEARCH_URL"); val != "" {
-		config.API.IPSearch.URL = val
-	}
-	if val := os.Getenv(prefix + "API_USER_INFO_URL"); val != "" {
-		config.API.UserInfo.URL = val
-	}
-	if val := os.Getenv(prefix + "API_ENTERPRISE_USERS_URL"); val != "" {
-		config.API.EnterpriseUsers.URL = val
-	}
+
 }
 
 // getEnv 获取环境变量，如果不存在则返回默认值
@@ -382,4 +204,34 @@ func (c *Config) ToLegacy() *LegacyConfig {
 		Port:          c.GetPort(),
 		LogLevel:      c.Logging.Level,
 	}
+}
+
+// GetLogConfig 获取日志配置
+func (c *Config) GetLogConfig() *LogConfig {
+	return &LogConfig{
+		Level:      c.Logging.Level,
+		Format:     c.Logging.Format,
+		Output:     c.Logging.Output,
+		Path:       c.Logging.File.Path,
+		Filename:   c.Logging.File.Filename,
+		MaxSize:    c.Logging.File.MaxSize,
+		MaxAge:     c.Logging.File.MaxAge,
+		MaxBackups: c.Logging.File.MaxBackups,
+		Compress:   c.Logging.File.Compress,
+		Daily:      c.Logging.Rotation.Daily,
+	}
+}
+
+// LogConfig 日志配置结构体（为了避免循环导入）
+type LogConfig struct {
+	Level      string
+	Format     string
+	Output     string
+	Path       string
+	Filename   string
+	MaxSize    int
+	MaxAge     int
+	MaxBackups int
+	Compress   bool
+	Daily      bool
 }

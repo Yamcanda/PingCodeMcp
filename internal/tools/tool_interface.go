@@ -3,10 +3,16 @@ package tools
 import (
 	"context"
 
-	"PingCodeMcp/internal/config"
-
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+)
+
+const (
+	baseUrl = "https://open.pingcode.com"
+)
+
+var (
+	toolsFns []func() *[]MCPTool
 )
 
 // MCPTool 定义MCP工具接口
@@ -31,16 +37,16 @@ func RegisterTool(mcpServer *server.MCPServer, tool MCPTool) {
 }
 
 // RegisterAllTools 注册所有工具到MCP服务器
-func RegisterAllTools(mcpServer *server.MCPServer, cfg *config.Config) {
-	tools := []MCPTool{
-		NewIpSearchTool(cfg),
-		NewUserInfoTool(cfg),
-		NewAuthenticatedRequestTool(cfg),
-		NewEnterpriseUsersTool(cfg),
-		NewCreateEnterpriseUserTool(cfg),
-	}
-
-	for _, tool := range tools {
-		RegisterTool(mcpServer, tool)
+func RegisterAllTools(mcpServer *server.MCPServer) {
+	// 遍历所有注册的工具创建函数
+	for _, toolFn := range toolsFns {
+		// 调用工具创建函数获取工具列表
+		tools := toolFn()
+		if tools != nil {
+			// 注册每个工具到MCP服务器
+			for _, tool := range *tools {
+				RegisterTool(mcpServer, tool)
+			}
+		}
 	}
 }

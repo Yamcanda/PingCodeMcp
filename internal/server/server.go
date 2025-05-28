@@ -26,7 +26,7 @@ func NewMCPServer() *MCPServer {
 	)
 
 	// 注册工具
-	registerTools(mcpServer, cfg)
+	registerTools(mcpServer)
 
 	return &MCPServer{
 		server: mcpServer,
@@ -47,7 +47,7 @@ func (s *MCPServer) GetConfig() *config.Config {
 }
 
 // registerTools 注册所有可用的工具
-func registerTools(mcpServer *server.MCPServer, cfg *config.Config) {
+func registerTools(mcpServer *server.MCPServer) {
 	// 使用新的接口方式注册所有工具
-	tools.RegisterAllTools(mcpServer, cfg)
+	tools.RegisterAllTools(mcpServer)
 }

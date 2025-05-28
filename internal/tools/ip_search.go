@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"PingCodeMcp/internal/config"
 	"PingCodeMcp/internal/utils"
 	"PingCodeMcp/pkg/logger"
 
@@ -17,7 +16,20 @@ import (
 
 const (
 	unknownAddr = "XX XX"
+	// IP查询服务API地址
+	ipSearchAPIURL = "https://whois.suyun.store/query"
+	// API请求超时时间
+	ipSearchTimeout = 10 * time.Second
 )
+
+// 注册工具
+func init() {
+	toolsFns = append(toolsFns, func() *[]MCPTool {
+		return &[]MCPTool{
+			NewIpSearchTool(),
+		}
+	})
+}
 
 type ipSearchResponse struct {
 	Status string `json:"status"`
@@ -31,15 +43,13 @@ type ipSearchResponse struct {
 type IpSearchTool struct {
 	name        string
 	description string
-	config      *config.Config
 }
 
 // NewIpSearchTool 创建IP查询工具实例
-func NewIpSearchTool(cfg *config.Config) MCPTool {
+func NewIpSearchTool() MCPTool {
 	return &IpSearchTool{
 		name:        "ip_search",
 		description: "Search IP location info",
-		config:      cfg,
 	}
 }
 
@@ -110,22 +120,20 @@ func (t *IpSearchTool) Handle(ctx context.Context, request mcp.CallToolRequest) 
 func (t *IpSearchTool) doIpSearch(ctx context.Context, ip string, log *logger.Logger) (string, error) {
 	query := map[string]string{"ip": ip}
 	headers := map[string]string{"Accept": "application/json"}
-	// 从配置中获取API URL
-	apiURL := t.config.API.IPSearch.URL
 	// 记录API调用开始
 	apiStartTime := time.Now()
-	log.With("url", apiURL, "method", "GET").Debug("发起IP查询API请求")
+	log.With("url", ipSearchAPIURL, "method", "GET").Debug("发起IP查询API请求")
 	// 创建带超时的上下文
-	timeoutCtx, cancel := context.WithTimeout(ctx, t.config.API.IPSearch.Timeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, ipSearchTimeout)
 	defer cancel()
-	body, _, err := utils.DoGet(timeoutCtx, apiURL, headers, query)
+	body, _, err := utils.DoGet(timeoutCtx, ipSearchAPIURL, headers, query)
 	apiDuration := time.Since(apiStartTime)
 	if err != nil {
-		log.With("url", apiURL, "api_duration_ms", apiDuration.Milliseconds(), "success", false, "error", err.Error()).Error("HTTP请求失败")
+		log.With("url", ipSearchAPIURL, "api_duration_ms", apiDuration.Milliseconds(), "success", false, "error", err.Error()).Error("HTTP请求失败")
 		return "", err
 	}
 	// 记录API调用成功
-	log.With("url", apiURL, "api_duration_ms", apiDuration.Milliseconds(), "response_size_bytes", len(body), "success", true).Debug("IP查询API请求成功")
+	log.With("url", ipSearchAPIURL, "api_duration_ms", apiDuration.Milliseconds(), "response_size_bytes", len(body), "success", true).Debug("IP查询API请求成功")
 	return string(body), nil
 }
 
@@ -135,12 +143,4 @@ func truncateString(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "..."
-}
-
-// HandleIpSearchTool 保持向后兼容的函数
-func HandleIpSearchTool(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	// 使用默认配置创建工具实例
-	cfg := config.Load()
-	tool := NewIpSearchTool(cfg)
-	return tool.Handle(ctx, request)
 }

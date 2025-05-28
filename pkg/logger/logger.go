@@ -1,6 +1,8 @@
 package logger
 
 import (
+	"PingCodeMcp/internal/config"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -14,31 +16,92 @@ type Logger struct {
 	*zap.SugaredLogger
 }
 
-// New creates a new zap logger instance (开发环境，输出到控制台和文件)
-func New() *Logger {
-	// 确保logs目录存在
-	logsDir := "logs"
-	if err := os.MkdirAll(logsDir, 0755); err != nil {
+var (
+	globalLogger *Logger
+)
+
+// InitGlobalLogger 初始化全局日志器
+func InitGlobalLogger(config *config.LogConfig) {
+	globalLogger = NewWithConfig(config)
+}
+
+// GetGlobalLogger 获取全局日志器
+func GetGlobalLogger() *Logger {
+	if globalLogger == nil {
+		// 如果没有初始化，使用默认配置
+		defaultConfig := config.LogConfig{
+			Level:    "info",
+			Format:   "console",
+			Output:   "both",
+			Path:     "logs",
+			Filename: "app.log",
+			Daily:    true,
+		}
+		globalLogger = NewWithConfig(&defaultConfig)
+	}
+	return globalLogger
+}
+
+// NewWithConfig 根据配置创建日志器
+func NewWithConfig(config *config.LogConfig) *Logger {
+	// 确保日志目录存在
+	if err := os.MkdirAll(config.Path, 0755); err != nil {
 		panic("Failed to create logs directory: " + err.Error())
 	}
 
-	// 开发环境配置
-	config := zap.NewDevelopmentConfig()
+	// 创建日志文件路径
+	var logFile string
+	if config.Daily {
+		// 按日期生成文件名
+		timestamp := time.Now().Format("2006-01-02")
+		filename := fmt.Sprintf("%s-%s.log",
+			config.Filename[:len(config.Filename)-4], // 移除.log扩展名
+			timestamp)
+		logFile = filepath.Join(config.Path, filename)
+	} else {
+		logFile = filepath.Join(config.Path, config.Filename)
+	}
 
-	// 同时输出到控制台和文件
-	logFile := filepath.Join(logsDir, "app.log")
-	config.OutputPaths = []string{"stdout", logFile}
-	config.ErrorOutputPaths = []string{"stderr", logFile}
+	// 根据格式选择配置
+	var zapConfig zap.Config
+	if config.Format == "json" {
+		zapConfig = zap.NewProductionConfig()
+	} else {
+		zapConfig = zap.NewDevelopmentConfig()
+	}
+
+	// 设置日志级别
+	level, err := zapcore.ParseLevel(config.Level)
+	if err != nil {
+		level = zapcore.InfoLevel
+	}
+	zapConfig.Level = zap.NewAtomicLevelAt(level)
+
+	// 设置输出路径
+	switch config.Output {
+	case "console":
+		zapConfig.OutputPaths = []string{"stdout"}
+		zapConfig.ErrorOutputPaths = []string{"stderr"}
+	case "file":
+		zapConfig.OutputPaths = []string{logFile}
+		zapConfig.ErrorOutputPaths = []string{logFile}
+	case "both":
+		zapConfig.OutputPaths = []string{"stdout", logFile}
+		zapConfig.ErrorOutputPaths = []string{"stderr", logFile}
+	default:
+		zapConfig.OutputPaths = []string{"stdout", logFile}
+		zapConfig.ErrorOutputPaths = []string{"stderr", logFile}
+	}
 
 	// 自定义编码器配置
-	config.EncoderConfig.TimeKey = "timestamp"
-	config.EncoderConfig.LevelKey = "level"
-	config.EncoderConfig.MessageKey = "message"
-	config.EncoderConfig.CallerKey = "caller"
-	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	zapConfig.EncoderConfig.TimeKey = "timestamp"
+	zapConfig.EncoderConfig.LevelKey = "level"
+	zapConfig.EncoderConfig.MessageKey = "message"
+	zapConfig.EncoderConfig.CallerKey = "caller"
+	zapConfig.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 
-	// 关键配置：增加调用栈跳过层数，显示真实调用位置
-	logger, err := config.Build(zap.AddCallerSkip(1))
+	// 创建logger
+	logger, err := zapConfig.Build(zap.AddCallerSkip(1))
 	if err != nil {
 		panic("Failed to initialize logger: " + err.Error())
 	}
@@ -49,6 +112,11 @@ func New() *Logger {
 	return &Logger{
 		SugaredLogger: sugar,
 	}
+}
+
+// New creates a new zap logger instance (使用全局配置)
+func New() *Logger {
+	return GetGlobalLogger()
 }
 
 // NewProduction creates a new production zap logger instance (生产环境，JSON格式)
