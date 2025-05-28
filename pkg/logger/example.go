@@ -35,15 +35,3 @@ func Example() {
 	// 记录HTTP请求
 	log.With("method", "POST", "path", "/api/users", "status_code", 201, "response_time_ms", 45, "user_agent", "Mozilla/5.0").Info("HTTP请求处理完成")
 }
-
-// ExampleProduction demonstrates production logger usage
-func ExampleProduction() {
-	// 创建生产环境logger (JSON格式输出)
-	log := NewProduction()
-	defer log.Sync()
-
-	log.Info("生产环境日志示例")
-
-	// 生产环境通常使用结构化日志
-	log.With("service", "user-service", "version", "1.2.3", "environment", "production").Info("服务启动")
-}

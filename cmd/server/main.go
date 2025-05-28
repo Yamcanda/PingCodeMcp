@@ -17,7 +17,7 @@ func main() {
 	cfg := config.Load()
 
 	// 获取日志器
-	log := logger.NewWithConfig(cfg.GetLogConfig())
+	log := logger.NewWithConfig(cfg)
 
 	// 确保在程序退出前刷新日志缓冲区
 	defer log.Sync()

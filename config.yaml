@@ -4,7 +4,7 @@ version: "1.0.0"
 
 # 服务器配置
 server:
-  name: "pingcode-mcp-server"
+  name: "ping-code-mcp-server"
   version: "1.0.0"
   port: 8080
   host: "0.0.0.0"
@@ -35,4 +35,4 @@ logging:
 # 例如: PINGCODE_MCP_SERVER_PORT=9090
 env_override:
   enabled: true
-  prefix: "PINGCODE_MCP"
+  prefix: "PingCodeMcp"
