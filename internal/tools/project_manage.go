@@ -17,8 +17,10 @@ import (
 )
 
 const (
-	projectAPIURL  = baseUrl + "/v1/project/projects"
-	projectTimeout = 15 * time.Second
+	projectAPIURL             = baseUrl + "/v1/project/projects"
+	projectMemberAPIURL       = baseUrl + "/v1/project/projects/%s/members"
+	projectRemoveMemberAPIURL = projectMemberAPIURL + "/%s"
+	projectTimeout            = 15 * time.Second
 )
 
 func init() {
@@ -26,6 +28,9 @@ func init() {
 		return &[]MCPTool{
 			NewProjectListTool(),
 			NewCreateProjectTool(),
+			NewAddProjectMemberTool(),
+			NewRemoveProjectMemberTool(),
+			NewGetProjectMembersTool(),
 		}
 	})
 }
@@ -43,6 +48,7 @@ type Member struct {
 	URL  string `json:"url"`
 	Type string `json:"type"`
 	User User   `json:"user"`
+	Role *Role  `json:"role,omitempty"` // 角色信息，可选
 }
 
 type ProjectState struct {
@@ -577,6 +583,643 @@ func (t *CreateProjectTool) formatCreateProjectResponse(project Project, identif
 	result.WriteString(fmt.Sprintf("创建者: %s (%s)\n", project.CreatedBy.DisplayName, project.CreatedBy.Name))
 
 	result.WriteString(fmt.Sprintf("详情链接: %s\n", project.URL))
+
+	return result.String()
+}
+
+// AddProjectMemberRequest 添加项目成员请求结构体
+type AddProjectMemberRequest struct {
+	UserID string `json:"user_id"`
+	Type   string `json:"type,omitempty"` // 成员类型，可选
+}
+
+// AddProjectMemberResponse 添加项目成员响应结构体
+type AddProjectMemberResponse struct {
+	ID      string  `json:"id"`
+	URL     string  `json:"url"`
+	Project Project `json:"project"`
+	Type    string  `json:"type"`
+	User    User    `json:"user"`
+	Role    Role    `json:"role"`
+}
+
+// AddProjectMemberTool 添加项目成员工具结构体
+type AddProjectMemberTool struct {
+	name        string
+	description string
+}
+
+// NewAddProjectMemberTool 创建添加项目成员工具实例
+func NewAddProjectMemberTool() MCPTool {
+	return &AddProjectMemberTool{
+		name:        "add_project_member",
+		description: "Add a member to a PingCode project",
+	}
+}
+
+// GetName 返回工具名称
+func (t *AddProjectMemberTool) GetName() string {
+	return t.name
+}
+
+// GetDescription 返回工具描述
+func (t *AddProjectMemberTool) GetDescription() string {
+	return t.description
+}
+
+// GetToolDefinition 返回工具定义
+func (t *AddProjectMemberTool) GetToolDefinition() mcp.Tool {
+	return mcp.NewTool(t.name,
+		mcp.WithDescription(t.description),
+		mcp.WithString("project_id",
+			mcp.Description("项目ID"),
+			mcp.Required(),
+		),
+		mcp.WithString("user_id",
+			mcp.Description("用户ID"),
+			mcp.Required(),
+		),
+		mcp.WithString("type",
+			mcp.Description("成员类型（可选）"),
+		),
+	)
+}
+
+// Handle 处理添加项目成员请求
+func (t *AddProjectMemberTool) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// 创建logger实例
+	log := logger.New()
+	defer log.Sync()
+
+	// 创建带有请求上下文的logger
+	requestLogger := log.With("tool", "add_project_member", "request_id", fmt.Sprintf("add_member_%d", time.Now().UnixNano()))
+
+	requestLogger.Info("开始添加项目成员")
+
+	// 从context中获取authkey
+	token, err := auth.TokenFromContext(ctx)
+	if err != nil {
+		requestLogger.With("success", false, "error", "missing_token").Error("添加项目成员失败：缺少认证令牌")
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	// 确保token格式正确
+	if !strings.HasPrefix(token, "Bearer ") {
+		token = "Bearer " + token
+	}
+
+	// 解析请求参数
+	projectID, memberRequest, err := t.parseAddMemberArguments(request.GetArguments())
+	if err != nil {
+		requestLogger.With("success", false, "error", err.Error()).Error("解析请求参数失败")
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	respStr, err := t.doAddMemberRequest(ctx, token, projectID, memberRequest, requestLogger)
+	if err != nil {
+		requestLogger.With("success", false, "error", err.Error()).Error("添加项目成员API调用失败")
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	var resp AddProjectMemberResponse
+	if err := json.Unmarshal([]byte(respStr), &resp); err != nil {
+		requestLogger.With("success", false, "error", "json_parse_failed").Error("解析添加成员响应失败")
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	// 格式化返回结果
+	result := t.formatAddMemberResponse(resp, projectID)
+
+	requestLogger.With("success", true, "project_id", projectID, "user_id", memberRequest.UserID).Info("项目成员添加成功")
+
+	return mcp.NewToolResultText(result), nil
+}
+
+// parseAddMemberArguments 解析添加项目成员请求参数
+func (t *AddProjectMemberTool) parseAddMemberArguments(args interface{}) (string, *AddProjectMemberRequest, error) {
+	if args == nil {
+		return "", nil, fmt.Errorf("missing required arguments")
+	}
+
+	argsMap, ok := args.(map[string]interface{})
+	if !ok {
+		return "", nil, fmt.Errorf("invalid arguments format")
+	}
+
+	var projectID string
+	memberRequest := &AddProjectMemberRequest{}
+
+	// 必需参数：项目ID
+	if pid, exists := argsMap["project_id"]; exists {
+		if pidStr, ok := pid.(string); ok && pidStr != "" {
+			projectID = pidStr
+		} else {
+			return "", nil, fmt.Errorf("project_id is required and must be a non-empty string")
+		}
+	} else {
+		return "", nil, fmt.Errorf("project_id is required")
+	}
+
+	// 必需参数：用户ID
+	if uid, exists := argsMap["user_id"]; exists {
+		if uidStr, ok := uid.(string); ok && uidStr != "" {
+			memberRequest.UserID = uidStr
+		} else {
+			return "", nil, fmt.Errorf("user_id is required and must be a non-empty string")
+		}
+	} else {
+		return "", nil, fmt.Errorf("user_id is required")
+	}
+
+	// 可选参数：成员类型
+	if memberType, exists := argsMap["type"]; exists {
+		if typeStr, ok := memberType.(string); ok && typeStr != "" {
+			memberRequest.Type = typeStr
+		}
+	}
+
+	return projectID, memberRequest, nil
+}
+
+// doAddMemberRequest 执行添加项目成员API调用
+func (t *AddProjectMemberTool) doAddMemberRequest(ctx context.Context, token string, projectID string, memberRequest *AddProjectMemberRequest, log *logger.Logger) (string, error) {
+	// 构建API URL
+	apiURL := fmt.Sprintf(projectMemberAPIURL, projectID)
+
+	headers := map[string]string{
+		"Authorization": token,
+		"Accept":        "application/json",
+		"Content-Type":  "application/json",
+	}
+
+	log.With("url", apiURL, "method", "POST", "project_id", projectID, "user_id", memberRequest.UserID).Debug("发起添加项目成员API请求")
+
+	// 创建带超时的上下文
+	timeoutCtx, cancel := context.WithTimeout(ctx, projectTimeout)
+	defer cancel()
+
+	// 序列化请求体
+	requestBody, err := json.Marshal(memberRequest)
+	if err != nil {
+		log.With("error", err.Error()).Error("序列化请求体失败")
+		return "", fmt.Errorf("failed to marshal request body: %w", err)
+	}
+
+	body, _, err := utils.DoPostJSON(timeoutCtx, apiURL, headers, requestBody)
+	if err != nil {
+		log.With("url", apiURL, "success", false, "error", err.Error()).Error("HTTP请求失败")
+		return "", err
+	}
+
+	log.With("url", apiURL, "response_size_bytes", len(body), "success", true).Debug("添加项目成员API请求成功")
+
+	return string(body), nil
+}
+
+// formatAddMemberResponse 格式化添加项目成员响应结果
+func (t *AddProjectMemberTool) formatAddMemberResponse(resp AddProjectMemberResponse, projectID string) string {
+	var result strings.Builder
+
+	result.WriteString("项目成员添加成功:\n\n")
+	result.WriteString(fmt.Sprintf("项目ID: %s\n", projectID))
+	result.WriteString(fmt.Sprintf("项目名称: %s (%s)\n", resp.Project.Name, resp.Project.Identifier))
+	result.WriteString(fmt.Sprintf("成员ID: %s\n", resp.ID))
+	result.WriteString(fmt.Sprintf("成员类型: %s\n", resp.Type))
+
+	// 显示角色信息
+	result.WriteString(fmt.Sprintf("角色: %s (ID: %s)\n", resp.Role.Name, resp.Role.ID))
+
+	result.WriteString(fmt.Sprintf("用户信息:\n"))
+	result.WriteString(fmt.Sprintf("  - 用户ID: %s\n", resp.User.ID))
+	result.WriteString(fmt.Sprintf("  - 用户名: %s\n", resp.User.Name))
+	result.WriteString(fmt.Sprintf("  - 显示名称: %s\n", resp.User.DisplayName))
+
+	if resp.User.Avatar != "" {
+		result.WriteString(fmt.Sprintf("  - 头像: %s\n", resp.User.Avatar))
+	}
+
+	result.WriteString(fmt.Sprintf("  - 详情链接: %s\n", resp.User.URL))
+	result.WriteString(fmt.Sprintf("成员详情链接: %s\n", resp.URL))
+
+	return result.String()
+}
+
+// RemoveProjectMemberRequest 移除项目成员请求结构体
+type RemoveProjectMemberRequest struct {
+	UserID string `json:"user_id"`
+}
+
+// RemoveProjectMemberResponse 移除项目成员响应结构体
+type RemoveProjectMemberResponse struct {
+	ID      string  `json:"id"`
+	URL     string  `json:"url"`
+	Type    string  `json:"type"`
+	User    User    `json:"user"`
+	Role    Role    `json:"role"`
+	Project Project `json:"project"`
+}
+
+// Role 角色结构体
+type Role struct {
+	ID   string `json:"id"`
+	URL  string `json:"url"`
+	Name string `json:"name"`
+}
+
+// RemoveProjectMemberTool 移除项目成员工具结构体
+type RemoveProjectMemberTool struct {
+	name        string
+	description string
+}
+
+// NewRemoveProjectMemberTool 创建移除项目成员工具实例
+func NewRemoveProjectMemberTool() MCPTool {
+	return &RemoveProjectMemberTool{
+		name:        "remove_project_member",
+		description: "Remove a member from a PingCode project",
+	}
+}
+
+// GetName 返回工具名称
+func (t *RemoveProjectMemberTool) GetName() string {
+	return t.name
+}
+
+// GetDescription 返回工具描述
+func (t *RemoveProjectMemberTool) GetDescription() string {
+	return t.description
+}
+
+// GetToolDefinition 返回工具定义
+func (t *RemoveProjectMemberTool) GetToolDefinition() mcp.Tool {
+	return mcp.NewTool(t.name,
+		mcp.WithDescription(t.description),
+		mcp.WithString("project_id",
+			mcp.Description("项目ID"),
+			mcp.Required(),
+		),
+		mcp.WithString("user_id",
+			mcp.Description("用户ID"),
+			mcp.Required(),
+		),
+	)
+}
+
+// Handle 处理移除项目成员请求
+func (t *RemoveProjectMemberTool) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// 创建logger实例
+	log := logger.New()
+	defer log.Sync()
+
+	// 创建带有请求上下文的logger
+	requestLogger := log.With("tool", "remove_project_member", "request_id", fmt.Sprintf("remove_member_%d", time.Now().UnixNano()))
+
+	requestLogger.Info("开始移除项目成员")
+
+	// 从context中获取authkey
+	token, err := auth.TokenFromContext(ctx)
+	if err != nil {
+		requestLogger.With("success", false, "error", "missing_token").Error("移除项目成员失败：缺少认证令牌")
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	// 确保token格式正确
+	if !strings.HasPrefix(token, "Bearer ") {
+		token = "Bearer " + token
+	}
+
+	// 解析请求参数
+	projectID, memberRequest, err := t.parseRemoveMemberArguments(request.GetArguments())
+	if err != nil {
+		requestLogger.With("success", false, "error", err.Error()).Error("解析请求参数失败")
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	respStr, err := t.doRemoveMemberRequest(ctx, token, projectID, memberRequest, requestLogger)
+	if err != nil {
+		requestLogger.With("success", false, "error", err.Error()).Error("移除项目成员API调用失败")
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	var resp RemoveProjectMemberResponse
+	if err := json.Unmarshal([]byte(respStr), &resp); err != nil {
+		requestLogger.With("success", false, "error", "json_parse_failed").Error("解析移除成员响应失败")
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	// 格式化返回结果
+	result := t.formatRemoveMemberResponse(resp, projectID)
+
+	requestLogger.With("success", true, "project_id", projectID, "user_id", memberRequest.UserID).Info("项目成员移除成功")
+
+	return mcp.NewToolResultText(result), nil
+}
+
+// parseRemoveMemberArguments 解析移除项目成员请求参数
+func (t *RemoveProjectMemberTool) parseRemoveMemberArguments(args interface{}) (string, *RemoveProjectMemberRequest, error) {
+	if args == nil {
+		return "", nil, fmt.Errorf("missing required arguments")
+	}
+
+	argsMap, ok := args.(map[string]interface{})
+	if !ok {
+		return "", nil, fmt.Errorf("invalid arguments format")
+	}
+
+	var projectID string
+	memberRequest := &RemoveProjectMemberRequest{}
+
+	// 必需参数：项目ID
+	if pid, exists := argsMap["project_id"]; exists {
+		if pidStr, ok := pid.(string); ok && pidStr != "" {
+			projectID = pidStr
+		} else {
+			return "", nil, fmt.Errorf("project_id is required and must be a non-empty string")
+		}
+	} else {
+		return "", nil, fmt.Errorf("project_id is required")
+	}
+
+	// 必需参数：用户ID
+	if uid, exists := argsMap["user_id"]; exists {
+		if uidStr, ok := uid.(string); ok && uidStr != "" {
+			memberRequest.UserID = uidStr
+		} else {
+			return "", nil, fmt.Errorf("user_id is required and must be a non-empty string")
+		}
+	} else {
+		return "", nil, fmt.Errorf("user_id is required")
+	}
+
+	return projectID, memberRequest, nil
+}
+
+// doRemoveMemberRequest 执行移除项目成员API调用
+func (t *RemoveProjectMemberTool) doRemoveMemberRequest(ctx context.Context, token string, projectID string, memberRequest *RemoveProjectMemberRequest, log *logger.Logger) (string, error) {
+	// 构建API URL - 使用 projectRemoveMemberAPIURL 并包含用户ID
+	apiURL := fmt.Sprintf(projectRemoveMemberAPIURL, projectID, memberRequest.UserID)
+
+	headers := map[string]string{
+		"Authorization": token,
+		"Accept":        "application/json",
+		"Content-Type":  "application/json",
+	}
+
+	log.With("url", apiURL, "method", "DELETE", "project_id", projectID, "user_id", memberRequest.UserID).Debug("发起移除项目成员API请求")
+
+	// 创建带超时的上下文
+	timeoutCtx, cancel := context.WithTimeout(ctx, projectTimeout)
+	defer cancel()
+
+	// 对于DELETE请求，通常不需要请求体，直接调用DoDelete
+	body, _, err := utils.DoDelete(timeoutCtx, apiURL, headers, nil)
+	if err != nil {
+		log.With("url", apiURL, "success", false, "error", err.Error()).Error("HTTP请求失败")
+		return "", err
+	}
+
+	log.With("url", apiURL, "response_size_bytes", len(body), "success", true).Debug("移除项目成员API请求成功")
+
+	return string(body), nil
+}
+
+// formatRemoveMemberResponse 格式化移除项目成员响应结果
+func (t *RemoveProjectMemberTool) formatRemoveMemberResponse(resp RemoveProjectMemberResponse, projectID string) string {
+	var result strings.Builder
+
+	result.WriteString("项目成员移除成功:\n\n")
+	result.WriteString(fmt.Sprintf("项目ID: %s\n", projectID))
+	result.WriteString(fmt.Sprintf("项目名称: %s (%s)\n", resp.Project.Name, resp.Project.Identifier))
+	result.WriteString(fmt.Sprintf("移除的成员信息:\n"))
+	result.WriteString(fmt.Sprintf("  - 成员ID: %s\n", resp.ID))
+	result.WriteString(fmt.Sprintf("  - 成员类型: %s\n", resp.Type))
+	result.WriteString(fmt.Sprintf("  - 用户ID: %s\n", resp.User.ID))
+	result.WriteString(fmt.Sprintf("  - 用户名: %s\n", resp.User.Name))
+	result.WriteString(fmt.Sprintf("  - 显示名称: %s\n", resp.User.DisplayName))
+
+	if resp.User.Avatar != "" {
+		result.WriteString(fmt.Sprintf("  - 头像: %s\n", resp.User.Avatar))
+	}
+
+	result.WriteString(fmt.Sprintf("  - 角色: %s (ID: %s)\n", resp.Role.Name, resp.Role.ID))
+	result.WriteString(fmt.Sprintf("  - 用户详情: %s\n", resp.User.URL))
+	result.WriteString(fmt.Sprintf("  - 成员详情: %s\n", resp.URL))
+
+	return result.String()
+}
+
+// ProjectMembersResponse 获取项目成员列表响应结构体
+type ProjectMembersResponse struct {
+	PageIndex int      `json:"page_index"`
+	PageSize  int      `json:"page_size"`
+	Total     int      `json:"total"`
+	Values    []Member `json:"values"`
+}
+
+// GetProjectMembersTool 获取项目成员列表工具结构体
+type GetProjectMembersTool struct {
+	name        string
+	description string
+}
+
+// NewGetProjectMembersTool 创建获取项目成员列表工具实例
+func NewGetProjectMembersTool() MCPTool {
+	return &GetProjectMembersTool{
+		name:        "get_project_members",
+		description: "Get the list of members in a PingCode project",
+	}
+}
+
+// GetName 返回工具名称
+func (t *GetProjectMembersTool) GetName() string {
+	return t.name
+}
+
+// GetDescription 返回工具描述
+func (t *GetProjectMembersTool) GetDescription() string {
+	return t.description
+}
+
+// GetToolDefinition 返回工具定义
+func (t *GetProjectMembersTool) GetToolDefinition() mcp.Tool {
+	return mcp.NewTool(t.name,
+		mcp.WithDescription(t.description),
+		mcp.WithString("project_id",
+			mcp.Description("项目ID"),
+			mcp.Required(),
+		),
+		mcp.WithNumber("page",
+			mcp.Description("页码，从1开始"),
+		),
+		mcp.WithNumber("page_size",
+			mcp.Description("每页数量，最大100"),
+		),
+	)
+}
+
+// Handle 处理获取项目成员列表请求
+func (t *GetProjectMembersTool) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// 创建logger实例
+	log := logger.New()
+	defer log.Sync()
+
+	// 创建带有请求上下文的logger
+	requestLogger := log.With("tool", "get_project_members", "request_id", fmt.Sprintf("get_members_%d", time.Now().UnixNano()))
+
+	requestLogger.Info("开始获取项目成员列表")
+
+	// 从context中获取authkey
+	token, err := auth.TokenFromContext(ctx)
+	if err != nil {
+		requestLogger.With("success", false, "error", "missing_token").Error("获取项目成员列表失败：缺少认证令牌")
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	// 确保token格式正确
+	if !strings.HasPrefix(token, "Bearer ") {
+		token = "Bearer " + token
+	}
+
+	// 解析请求参数
+	projectID, params, err := t.parseGetMembersArguments(request.GetArguments())
+	if err != nil {
+		requestLogger.With("success", false, "error", err.Error()).Error("解析请求参数失败")
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	respStr, err := t.doGetMembersRequest(ctx, token, projectID, params, requestLogger)
+	if err != nil {
+		requestLogger.With("success", false, "error", err.Error()).Error("获取项目成员列表API调用失败")
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	var resp ProjectMembersResponse
+	if err := json.Unmarshal([]byte(respStr), &resp); err != nil {
+		requestLogger.With("success", false, "error", "json_parse_failed").Error("解析获取成员列表响应失败")
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	// 格式化返回结果
+	result := t.formatGetMembersResponse(resp, projectID)
+
+	requestLogger.With("success", true, "project_id", projectID, "member_count", len(resp.Values)).Info("项目成员列表获取成功")
+
+	return mcp.NewToolResultText(result), nil
+}
+
+// parseGetMembersArguments 解析获取项目成员列表请求参数
+func (t *GetProjectMembersTool) parseGetMembersArguments(args interface{}) (string, map[string]string, error) {
+	if args == nil {
+		return "", nil, fmt.Errorf("missing required arguments")
+	}
+
+	argsMap, ok := args.(map[string]interface{})
+	if !ok {
+		return "", nil, fmt.Errorf("invalid arguments format")
+	}
+
+	var projectID string
+	params := map[string]string{
+		"page_index": "0",
+		"page_size":  "20",
+	}
+
+	// 必需参数：项目ID
+	if pid, exists := argsMap["project_id"]; exists {
+		if pidStr, ok := pid.(string); ok && pidStr != "" {
+			projectID = pidStr
+		} else {
+			return "", nil, fmt.Errorf("project_id is required and must be a non-empty string")
+		}
+	} else {
+		return "", nil, fmt.Errorf("project_id is required")
+	}
+
+	// 可选参数：页码
+	if page, exists := argsMap["page"]; exists {
+		if pageFloat, ok := page.(float64); ok {
+			pageIndex := int(pageFloat) - 1
+			if pageIndex < 0 {
+				pageIndex = 0
+			}
+			params["page_index"] = fmt.Sprintf("%d", pageIndex)
+		}
+	}
+
+	// 可选参数：每页数量
+	if pageSize, exists := argsMap["page_size"]; exists {
+		if pageSizeFloat, ok := pageSize.(float64); ok {
+			params["page_size"] = fmt.Sprintf("%.0f", pageSizeFloat)
+		}
+	}
+
+	return projectID, params, nil
+}
+
+// doGetMembersRequest 执行获取项目成员列表API调用
+func (t *GetProjectMembersTool) doGetMembersRequest(ctx context.Context, token string, projectID string, params map[string]string, log *logger.Logger) (string, error) {
+	// 构建API URL
+	apiURL := fmt.Sprintf(projectMemberAPIURL, projectID)
+
+	headers := map[string]string{
+		"Authorization": token,
+		"Content-Type":  "application/json",
+	}
+
+	log.With("url", apiURL, "method", "GET", "project_id", projectID).Debug("发起获取项目成员列表API请求")
+
+	// 创建带超时的上下文
+	timeoutCtx, cancel := context.WithTimeout(ctx, projectTimeout)
+	defer cancel()
+
+	body, _, err := utils.DoGet(timeoutCtx, apiURL, headers, params)
+	if err != nil {
+		log.With("url", apiURL, "success", false, "error", err.Error()).Error("HTTP请求失败")
+		return "", err
+	}
+
+	log.With("url", apiURL, "response_size_bytes", len(body), "success", true).Debug("获取项目成员列表API请求成功")
+
+	return string(body), nil
+}
+
+// formatGetMembersResponse 格式化获取项目成员列表响应结果
+func (t *GetProjectMembersTool) formatGetMembersResponse(resp ProjectMembersResponse, projectID string) string {
+	var result strings.Builder
+
+	// 计算当前页码（从1开始显示）和总页数
+	currentPage := resp.PageIndex + 1
+	totalPages := (resp.Total + resp.PageSize - 1) / resp.PageSize
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
+	result.WriteString(fmt.Sprintf("项目成员列表 (项目ID: %s)\n", projectID))
+	result.WriteString(fmt.Sprintf("第%d页，共%d页，总计%d个成员:\n\n", currentPage, totalPages, resp.Total))
+
+	if len(resp.Values) == 0 {
+		result.WriteString("该项目暂无成员")
+		return result.String()
+	}
+
+	for i, member := range resp.Values {
+		result.WriteString(fmt.Sprintf("%d. %s (%s)\n", i+1, member.User.DisplayName, member.User.Name))
+		result.WriteString(fmt.Sprintf("   成员ID: %s\n", member.ID))
+		result.WriteString(fmt.Sprintf("   用户ID: %s\n", member.User.ID))
+		result.WriteString(fmt.Sprintf("   成员类型: %s\n", member.Type))
+
+		// 显示角色信息
+		if member.Role != nil {
+			result.WriteString(fmt.Sprintf("   角色: %s (ID: %s)\n", member.Role.Name, member.Role.ID))
+		}
+
+		if member.User.Avatar != "" {
+			result.WriteString(fmt.Sprintf("   头像: %s\n", member.User.Avatar))
+		}
+
+		result.WriteString(fmt.Sprintf("   用户详情: %s\n", member.User.URL))
+		result.WriteString(fmt.Sprintf("   成员详情: %s\n\n", member.URL))
+	}
 
 	return result.String()
 }
