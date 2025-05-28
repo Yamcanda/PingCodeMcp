@@ -132,7 +132,7 @@ func (t *CreateWorkloadTool) GetToolDefinition() mcp.Tool {
 		mcp.WithString("principal_type", mcp.Description("工时主体的类型。允许值: work_item"), mcp.Required()),
 		mcp.WithString("type_id", mcp.Description("工时类型的id"), mcp.Required()),
 		mcp.WithNumber("duration", mcp.Description("工时的时长。单位是小时，数值可以是为0-24之间，最多包含一位小数的正数"), mcp.Required()),
-		mcp.WithNumber("report_at", mcp.Description("工时的登记日期。该值为十位数字组成的时间戳，会被转换为该时间当天的零点零分零秒"), mcp.Required()),
+		mcp.WithNumber("report_at", mcp.Description("工时的登记日期。该值为十位数字组成的时间戳，会被转换为该时间当天的零点零分零秒，默认为当天")),
 		mcp.WithString("report_by_id", mcp.Description("工时的登记人，企业鉴权时必填。个人鉴权时不需要传递，即使传递了也会被忽略")),
 		mcp.WithString("description", mcp.Description("工时的说明")),
 	)
@@ -235,6 +235,7 @@ func (t *CreateWorkloadTool) parseCreateWorkloadArguments(args interface{}) (*Cr
 		return nil, fmt.Errorf("缺少必填参数 duration")
 	}
 
+	// 解析 report_at 参数，如果为空则默认为当天
 	if reportAt, exists := argsMap["report_at"]; exists {
 		switch v := reportAt.(type) {
 		case float64:
@@ -247,7 +248,10 @@ func (t *CreateWorkloadTool) parseCreateWorkloadArguments(args interface{}) (*Cr
 			return nil, fmt.Errorf("report_at 必须是时间戳")
 		}
 	} else {
-		return nil, fmt.Errorf("缺少必填参数 report_at")
+		// 默认为当天零点的时间戳
+		now := time.Now()
+		today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+		request.ReportAt = today.Unix()
 	}
 
 	// 解析可选参数
@@ -867,7 +871,7 @@ func (t *UpdateWorkloadTool) GetToolDefinition() mcp.Tool {
 		mcp.WithString("workload_id", mcp.Description("工时的id"), mcp.Required()),
 		mcp.WithString("type_id", mcp.Description("工时类型的id")),
 		mcp.WithNumber("duration", mcp.Description("工时的时长。单位是小时，数值可以是为0-24之间，最多包含一位小数的正数")),
-		mcp.WithNumber("report_at", mcp.Description("工时的登记日期。该值为十位数字组成的时间戳，会被转换为该时间当天的零点零分零秒")),
+		mcp.WithNumber("report_at", mcp.Description("工时的登记日期。该值为十位数字组成的时间戳，会被转换为该时间当天的零点零分零秒，默认为当天")),
 		mcp.WithString("report_by_id", mcp.Description("工时的登记人，企业鉴权时必填。个人鉴权时不需要传递，即使传递了也会被忽略")),
 		mcp.WithString("description", mcp.Description("工时的说明")),
 	)
@@ -952,6 +956,7 @@ func (t *UpdateWorkloadTool) parseUpdateWorkloadArguments(args interface{}) (str
 		}
 	}
 
+	// 解析 report_at 参数，如果提供了值则使用，否则不更新（保持原值）
 	if reportAt, exists := argsMap["report_at"]; exists {
 		switch v := reportAt.(type) {
 		case float64:
@@ -962,6 +967,12 @@ func (t *UpdateWorkloadTool) parseUpdateWorkloadArguments(args interface{}) (str
 			request.ReportAt = &val
 		case int64:
 			request.ReportAt = &v
+		case nil:
+			// 如果明确传入 null，则设置为当天
+			now := time.Now()
+			today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+			val := today.Unix()
+			request.ReportAt = &val
 		default:
 			return "", nil, fmt.Errorf("report_at 必须是时间戳")
 		}
