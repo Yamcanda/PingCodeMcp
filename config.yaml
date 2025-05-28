@@ -11,7 +11,7 @@ server:
 
 # 日志配置
 logging:
-  level: "info"  # debug, info, warn, error, fatal
+  level: "debug"  # debug, info, warn, error, fatal
   format: "console"  # json, console
   output: "both"  # console, file, both
 
