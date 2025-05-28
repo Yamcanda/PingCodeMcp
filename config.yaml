@@ -36,40 +36,8 @@ logging:
     enabled: true
     daily: true
 
-# API 配置
-api:
-  # IP查询服务配置
-  ip_search:
-    url: "https://whois.suyun.store/query"
-    timeout: 10s
-    retry_count: 3
-    retry_delay: 1s
-
-  # 用户信息服务配置
-  user_info:
-    url: "https://open.pingcode.com/v1/myself"
-    timeout: 15s
-    retry_count: 2
-    retry_delay: 2s
-
-  # 企业成员列表服务配置
-  enterprise_users:
-    url: "https://open.pingcode.com/v1/directory/users"
-    timeout: 15s
-    retry_count: 2
-    retry_delay: 2s
-
-# 认证配置
-auth:
-  # Token 配置
-  token:
-    header_name: "Authorization"
-    prefix: "Bearer "
-
-  # 会话配置
-  session:
-    timeout: 3600s  # 1小时
-    refresh_threshold: 300s  # 5分钟
+# API 配置文件引用
+api_config_file: "api_config.yaml"
 
 # 性能配置
 performance:

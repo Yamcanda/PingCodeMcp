@@ -12,16 +12,17 @@ import (
 
 // Config 应用程序配置结构体
 type Config struct {
-	Version     string            `yaml:"version"`
-	Server      ServerConfig      `yaml:"server"`
-	Logging     LoggingConfig     `yaml:"logging"`
-	API         APIConfig         `yaml:"api"`
-	Auth        AuthConfig        `yaml:"auth"`
-	Performance PerformanceConfig `yaml:"performance"`
-	Monitoring  MonitoringConfig  `yaml:"monitoring"`
-	Development DevelopmentConfig `yaml:"development"`
-	Production  ProductionConfig  `yaml:"production"`
-	EnvOverride EnvOverrideConfig `yaml:"env_override"`
+	Version       string            `yaml:"version"`
+	Server        ServerConfig      `yaml:"server"`
+	Logging       LoggingConfig     `yaml:"logging"`
+	APIConfigFile string            `yaml:"api_config_file"` // API配置文件路径
+	API           APIConfig         `yaml:"api,omitempty"`   // 可选：直接配置或从文件加载
+	Auth          AuthConfig        `yaml:"auth,omitempty"`  // 可选：直接配置或从文件加载
+	Performance   PerformanceConfig `yaml:"performance"`
+	Monitoring    MonitoringConfig  `yaml:"monitoring"`
+	Development   DevelopmentConfig `yaml:"development"`
+	Production    ProductionConfig  `yaml:"production"`
+	EnvOverride   EnvOverrideConfig `yaml:"env_override"`
 }
 
 // ServerConfig 服务器配置
@@ -172,9 +173,33 @@ type EnvOverrideConfig struct {
 	Prefix  string `yaml:"prefix"`
 }
 
+// APIConfigFile API配置文件结构
+type APIConfigFile struct {
+	Version string     `yaml:"version"`
+	API     APIConfig  `yaml:"api"`
+	Auth    AuthConfig `yaml:"auth"`
+}
+
 // Load 加载配置文件
 func Load() *Config {
-	return LoadFromFile("config.yaml")
+	return LoadWithAPIConfig()
+}
+
+// LoadWithAPIConfig 加载主配置并合并 API 配置
+func LoadWithAPIConfig() *Config {
+	// 加载主配置
+	config := LoadFromFile("config.yaml")
+
+	// 检查是否指定了 API 配置文件
+	if config.APIConfigFile != "" {
+		if apiConfig, err := LoadAPIConfig(config.APIConfigFile); err == nil {
+			// 合并 API 配置
+			config.API = apiConfig.API
+			config.Auth = apiConfig.Auth
+		}
+	}
+
+	return config
 }
 
 // LoadFromFile 从指定文件加载配置
@@ -183,8 +208,7 @@ func LoadFromFile(filename string) *Config {
 
 	// 尝试加载YAML配置文件
 	if err := loadYAMLConfig(filename, config); err != nil {
-		// 如果加载失败，使用默认配置
-		config = getDefaultConfig()
+		return config
 	}
 
 	// 应用环境变量覆盖
@@ -193,6 +217,30 @@ func LoadFromFile(filename string) *Config {
 	}
 
 	return config
+}
+
+// LoadAPIConfig 加载 API 配置文件
+func LoadAPIConfig(filename string) (*APIConfigFile, error) {
+	apiConfig := &APIConfigFile{}
+
+	// 查找配置文件
+	configPath := findConfigFile(filename)
+	if configPath == "" {
+		return nil, fmt.Errorf("API配置文件 %s 未找到", filename)
+	}
+
+	// 读取文件内容
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("读取API配置文件失败: %w", err)
+	}
+
+	// 解析YAML
+	if err := yaml.Unmarshal(data, apiConfig); err != nil {
+		return nil, fmt.Errorf("解析API配置YAML失败: %w", err)
+	}
+
+	return apiConfig, nil
 }
 
 // loadYAMLConfig 加载YAML配置文件
@@ -236,111 +284,9 @@ func findConfigFile(filename string) string {
 	return ""
 }
 
-// getDefaultConfig 获取默认配置
-func getDefaultConfig() *Config {
-	return &Config{
-		Version: "1.0.0",
-		Server: ServerConfig{
-			Name:    getEnv("SERVER_NAME", "pingcode-mcp-server"),
-			Version: getEnv("SERVER_VERSION", "1.0.0"),
-			Port:    getEnvAsInt("PORT", 8080),
-			Host:    getEnv("HOST", "0.0.0.0"),
-			Timeout: TimeoutConfig{
-				Read:     30 * time.Second,
-				Write:    30 * time.Second,
-				Idle:     60 * time.Second,
-				Shutdown: 10 * time.Second,
-			},
-		},
-		Logging: LoggingConfig{
-			Level:  getEnv("LOG_LEVEL", "info"),
-			Format: getEnv("LOG_FORMAT", "json"),
-			Output: getEnv("LOG_OUTPUT", "both"),
-			File: FileLogConfig{
-				Path:       "logs",
-				Filename:   "app.log",
-				MaxSize:    100,
-				MaxAge:     7,
-				MaxBackups: 10,
-				Compress:   true,
-			},
-			Rotation: RotationConfig{
-				Enabled: true,
-				Daily:   true,
-			},
-		},
-		API: APIConfig{
-			IPSearch: IPSearchConfig{
-				URL:        "https://whois.suyun.store/query",
-				Timeout:    10 * time.Second,
-				RetryCount: 3,
-				RetryDelay: 1 * time.Second,
-			},
-			UserInfo: UserInfoConfig{
-				URL:        "https://api.pingcode.com/v1/user/info",
-				Timeout:    15 * time.Second,
-				RetryCount: 2,
-				RetryDelay: 2 * time.Second,
-			},
-			EnterpriseUsers: EnterpriseUsersConfig{
-				URL:        "https://api.pingcode.com/v1/enterprise/users",
-				Timeout:    15 * time.Second,
-				RetryCount: 2,
-				RetryDelay: 2 * time.Second,
-			},
-		},
-		Auth: AuthConfig{
-			Token: TokenConfig{
-				HeaderName: "Authorization",
-				Prefix:     "Bearer ",
-			},
-			Session: SessionConfig{
-				Timeout:          3600 * time.Second,
-				RefreshThreshold: 300 * time.Second,
-			},
-		},
-		Performance: PerformanceConfig{
-			HTTPClient: HTTPClientConfig{
-				MaxIdleConns:        100,
-				MaxIdleConnsPerHost: 10,
-				IdleConnTimeout:     90 * time.Second,
-			},
-			Concurrency: ConcurrencyConfig{
-				MaxWorkers: 50,
-				QueueSize:  1000,
-			},
-		},
-		Monitoring: MonitoringConfig{
-			HealthCheck: HealthCheckConfig{
-				Enabled:  true,
-				Path:     "/health",
-				Interval: 30 * time.Second,
-			},
-			Metrics: MetricsConfig{
-				Enabled: true,
-				Path:    "/metrics",
-			},
-		},
-		Development: DevelopmentConfig{
-			Debug:     false,
-			HotReload: false,
-			Profiling: false,
-		},
-		Production: ProductionConfig{
-			Debug:     false,
-			Profiling: false,
-		},
-		EnvOverride: EnvOverrideConfig{
-			Enabled: true,
-			Prefix:  "PINGCODE_MCP",
-		},
-	}
-}
-
 // applyEnvOverrides 应用环境变量覆盖
 func applyEnvOverrides(config *Config) {
 	prefix := config.EnvOverride.Prefix + "_"
-
 	// 服务器配置覆盖
 	if val := os.Getenv(prefix + "SERVER_NAME"); val != "" {
 		config.Server.Name = val
@@ -356,7 +302,6 @@ func applyEnvOverrides(config *Config) {
 	if val := os.Getenv(prefix + "SERVER_HOST"); val != "" {
 		config.Server.Host = val
 	}
-
 	// 日志配置覆盖
 	if val := os.Getenv(prefix + "LOGGING_LEVEL"); val != "" {
 		config.Logging.Level = val
@@ -367,7 +312,10 @@ func applyEnvOverrides(config *Config) {
 	if val := os.Getenv(prefix + "LOGGING_OUTPUT"); val != "" {
 		config.Logging.Output = val
 	}
-
+	// API配置文件路径覆盖
+	if val := os.Getenv(prefix + "API_CONFIG_FILE"); val != "" {
+		config.APIConfigFile = val
+	}
 	// API配置覆盖
 	if val := os.Getenv(prefix + "API_IP_SEARCH_URL"); val != "" {
 		config.API.IPSearch.URL = val

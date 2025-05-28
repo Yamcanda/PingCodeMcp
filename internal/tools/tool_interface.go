@@ -11,6 +11,7 @@ import (
 
 // MCPTool 定义MCP工具接口
 type MCPTool interface {
+
 	// GetToolDefinition 返回工具的定义信息
 	GetToolDefinition() mcp.Tool
 
