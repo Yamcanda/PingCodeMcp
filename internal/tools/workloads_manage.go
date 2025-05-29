@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"PingCodeMcp/internal/models"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -296,6 +297,12 @@ func (t *CreateWorkloadTool) doCreateWorkloadRequest(ctx context.Context, token 
 		return "", fmt.Errorf("HTTP请求失败: %w", err)
 	}
 
+	var errorRes models.ErrorResponse
+	if err := json.Unmarshal(body, &errorRes); err == nil && errorRes.Code != "" {
+		log.Error("创建工时失败", "error", err)
+		return "", fmt.Errorf("创建工时失败: %s", errorRes.Message)
+	}
+
 	// 解析响应
 	var workloadResp CreateWorkloadResponse
 	if err := json.Unmarshal(body, &workloadResp); err != nil {
@@ -365,7 +372,7 @@ type GetWorkloadTypesTool struct {
 func NewGetWorkloadTypesTool() MCPTool {
 	return &GetWorkloadTypesTool{
 		name:        "get_workload_types",
-		description: "获取工时类型列表",
+		description: "Get a list of workload types",
 	}
 }
 
@@ -428,6 +435,12 @@ func (t *GetWorkloadTypesTool) doGetWorkloadTypesRequest(ctx context.Context, to
 		return "", fmt.Errorf("HTTP请求失败: %w", err)
 	}
 
+	var errorRes models.ErrorResponse
+	if err := json.Unmarshal(body, &errorRes); err == nil && errorRes.Code != "" {
+		log.Error("获取工时类型失败", "error", err)
+		return "", fmt.Errorf("获取工时类型失败: %s", errorRes.Message)
+	}
+
 	// 解析响应
 	var workloadTypesResp GetWorkloadTypesResponse
 	if err := json.Unmarshal(body, &workloadTypesResp); err != nil {
@@ -473,7 +486,7 @@ type DeleteWorkloadTool struct {
 func NewDeleteWorkloadTool() MCPTool {
 	return &DeleteWorkloadTool{
 		name:        "delete_workload",
-		description: "删除一个工时",
+		description: "Delete a workload",
 	}
 }
 
@@ -616,7 +629,7 @@ type ListWorkloadsTool struct {
 func NewListWorkloadsTool() MCPTool {
 	return &ListWorkloadsTool{
 		name:        "list_workloads",
-		description: "获取工时列表",
+		description: "Get a list of workloads",
 	}
 }
 
@@ -782,6 +795,12 @@ func (t *ListWorkloadsTool) doListWorkloadsRequest(ctx context.Context, token st
 		return "", fmt.Errorf("HTTP请求失败: %w", err)
 	}
 
+	var errorRes models.ErrorResponse
+	if err := json.Unmarshal(body, &errorRes); err == nil && errorRes.Code != "" {
+		log.Error("获取工时列表失败", "error", err)
+		return "", fmt.Errorf("获取工时列表失败: %s", errorRes.Message)
+	}
+
 	// 解析响应
 	var workloadsResp ListWorkloadsResponse
 	if err := json.Unmarshal(body, &workloadsResp); err != nil {
@@ -853,7 +872,7 @@ type UpdateWorkloadTool struct {
 func NewUpdateWorkloadTool() MCPTool {
 	return &UpdateWorkloadTool{
 		name:        "update_workload",
-		description: "部分更新一个工时",
+		description: "Partially update one workload",
 	}
 }
 
@@ -1020,6 +1039,12 @@ func (t *UpdateWorkloadTool) doUpdateWorkloadRequest(ctx context.Context, token 
 	body, _, err := utils.DoPatch(timeoutCtx, updateURL, headers, requestBody)
 	if err != nil {
 		return "", fmt.Errorf("HTTP请求失败: %w", err)
+	}
+
+	var errorRes models.ErrorResponse
+	if err := json.Unmarshal(body, &errorRes); err == nil && errorRes.Code != "" {
+		log.Error("更新工时失败", "error", err)
+		return "", fmt.Errorf("更新工时失败: %s", errorRes.Message)
 	}
 
 	// 解析响应

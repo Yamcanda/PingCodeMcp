@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"PingCodeMcp/internal/auth"
+	"PingCodeMcp/internal/models"
 	"PingCodeMcp/internal/utils"
 	"PingCodeMcp/pkg/logger"
 
@@ -228,6 +229,12 @@ func (t *CreateWorkItemTool) Handle(ctx context.Context, request mcp.CallToolReq
 	respStr, err := t.doCreateWorkItemRequest(ctx, token, workItemRequest, requestLogger)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	var errorRes models.ErrorResponse
+	if err := json.Unmarshal([]byte(respStr), &errorRes); err == nil && errorRes.Code != "" {
+		requestLogger.With("success", false, "error", errorRes.Message).Error("创建工作项API调用失败")
+		return mcp.NewToolResultError(errorRes.Message), nil
 	}
 
 	var resp CreateWorkItemResponse
@@ -723,6 +730,12 @@ func (t *UpdateWorkItemTool) Handle(ctx context.Context, request mcp.CallToolReq
 	respStr, err := t.doUpdateWorkItemRequest(ctx, token, workItemID, updateRequest, requestLogger)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	var errorRes models.ErrorResponse
+	if err := json.Unmarshal([]byte(respStr), &errorRes); err == nil && errorRes.Code != "" {
+		requestLogger.With("success", false, "error", errorRes.Message).Error("更新工作项API调用失败")
+		return mcp.NewToolResultError(errorRes.Message), nil
 	}
 
 	var resp UpdateWorkItemResponse

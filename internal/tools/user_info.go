@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"PingCodeMcp/internal/auth"
+	"PingCodeMcp/internal/models"
 	"PingCodeMcp/internal/utils"
 	"PingCodeMcp/pkg/logger"
 
@@ -100,6 +101,12 @@ func (t *UserInfoTool) Handle(ctx context.Context, request mcp.CallToolRequest) 
 	if err != nil {
 		requestLogger.With("success", false, "error", err.Error()).Error("用户信息API调用失败")
 		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	var errorRes models.ErrorResponse
+	if err := json.Unmarshal([]byte(respStr), &errorRes); err == nil && errorRes.Code != "" {
+		requestLogger.With("success", false, "error", errorRes.Message).Error("用户信息API调用失败")
+		return mcp.NewToolResultError(errorRes.Message), nil
 	}
 
 	var resp userInfoResponse

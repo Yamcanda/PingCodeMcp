@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"PingCodeMcp/internal/models"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -135,6 +136,12 @@ func (t *EnterpriseUsersTool) Handle(ctx context.Context, request mcp.CallToolRe
 	if err != nil {
 		requestLogger.With("success", false, "error", err.Error()).Error("企业成员列表API调用失败")
 		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	var errorRes models.ErrorResponse
+	if err := json.Unmarshal([]byte(respStr), &errorRes); err == nil && errorRes.Code != "" {
+		requestLogger.With("success", false, "error", errorRes.Message).Error("企业成员列表API调用失败")
+		return mcp.NewToolResultError(errorRes.Message), nil
 	}
 
 	var resp EnterpriseUsersResponse

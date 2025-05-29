@@ -9,6 +9,7 @@ import (
 	"unicode"
 
 	"PingCodeMcp/internal/auth"
+	"PingCodeMcp/internal/models"
 	"PingCodeMcp/internal/utils"
 	"PingCodeMcp/pkg/logger"
 
@@ -136,6 +137,12 @@ func (t *ProjectListTool) Handle(ctx context.Context, request mcp.CallToolReques
 	respStr, err := t.doRequest(ctx, token, params, requestLogger)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	var errorRes models.ErrorResponse
+	if err := json.Unmarshal([]byte(respStr), &errorRes); err == nil && errorRes.Code != "" {
+		requestLogger.With("success", false, "error", errorRes.Message).Error("项目列表API调用失败")
+		return mcp.NewToolResultError(errorRes.Message), nil
 	}
 
 	var resp ProjectListResponse
@@ -411,6 +418,12 @@ func (t *CreateProjectTool) Handle(ctx context.Context, request mcp.CallToolRequ
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
+	var errorRes models.ErrorResponse
+	if err := json.Unmarshal([]byte(respStr), &errorRes); err == nil && errorRes.Code != "" {
+		requestLogger.With("success", false, "error", errorRes.Message).Error("创建项目API调用失败")
+		return mcp.NewToolResultError(errorRes.Message), nil
+	}
+
 	var resp Project
 	if err := json.Unmarshal([]byte(respStr), &resp); err != nil {
 		requestLogger.With("success", false, "error", "json_parse_failed").Error("解析创建项目响应失败")
@@ -681,6 +694,12 @@ func (t *AddProjectMemberTool) Handle(ctx context.Context, request mcp.CallToolR
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
+	var errorRes models.ErrorResponse
+	if err := json.Unmarshal([]byte(respStr), &errorRes); err == nil && errorRes.Code != "" {
+		requestLogger.With("success", false, "error", errorRes.Message).Error("添加项目成员API调用失败")
+		return mcp.NewToolResultError(errorRes.Message), nil
+	}
+
 	var resp AddProjectMemberResponse
 	if err := json.Unmarshal([]byte(respStr), &resp); err != nil {
 		requestLogger.With("success", false, "error", "json_parse_failed").Error("解析添加成员响应失败")
@@ -901,6 +920,12 @@ func (t *RemoveProjectMemberTool) Handle(ctx context.Context, request mcp.CallTo
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
+	var errorRes models.ErrorResponse
+	if err := json.Unmarshal([]byte(respStr), &errorRes); err == nil && errorRes.Code != "" {
+		requestLogger.With("success", false, "error", errorRes.Message).Error("移除项目成员API调用失败")
+		return mcp.NewToolResultError(errorRes.Message), nil
+	}
+
 	var resp RemoveProjectMemberResponse
 	if err := json.Unmarshal([]byte(respStr), &resp); err != nil {
 		requestLogger.With("success", false, "error", "json_parse_failed").Error("解析移除成员响应失败")
@@ -1091,6 +1116,12 @@ func (t *GetProjectMembersTool) Handle(ctx context.Context, request mcp.CallTool
 	if err != nil {
 		requestLogger.With("success", false, "error", err.Error()).Error("获取项目成员列表API调用失败")
 		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	var errorRes models.ErrorResponse
+	if err := json.Unmarshal([]byte(respStr), &errorRes); err == nil && errorRes.Code != "" {
+		requestLogger.With("success", false, "error", errorRes.Message).Error("获取项目成员列表API调用失败")
+		return mcp.NewToolResultError(errorRes.Message), nil
 	}
 
 	var resp ProjectMembersResponse
