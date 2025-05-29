@@ -70,7 +70,7 @@ func (t *UserInfoTool) GetDescription() string {
 // GetToolDefinition 返回工具定义
 func (t *UserInfoTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
-		mcp.WithDescription(t.description),
+		mcp.WithDescription("获取当前用户的基本信息 - 包括用户ID、姓名、邮箱、电话、状态、角色、部门等详细信息"),
 	)
 }
 

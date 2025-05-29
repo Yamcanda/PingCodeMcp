@@ -66,9 +66,9 @@ func (t *IpSearchTool) GetDescription() string {
 // GetToolDefinition 返回工具定义
 func (t *IpSearchTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
-		mcp.WithDescription(t.description),
+		mcp.WithDescription("查询IP地址的地理位置信息 - 获取指定IP地址的国家和城市信息"),
 		mcp.WithString("ip",
-			mcp.Description("IP address to search"),
+			mcp.Description("IP地址 - 必填，要查询地理位置的IPv4地址，如：192.168.1.1"),
 			mcp.Required(),
 		),
 	)

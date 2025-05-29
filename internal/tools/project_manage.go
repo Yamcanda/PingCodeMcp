@@ -111,9 +111,9 @@ func (t *ProjectListTool) GetDescription() string {
 
 func (t *ProjectListTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
-		mcp.WithDescription(t.description),
-		mcp.WithNumber("page", mcp.Description("页码，从1开始")),
-		mcp.WithNumber("page_size", mcp.Description("每页数量，最大100")),
+		mcp.WithDescription("获取PingCode项目列表 - 查看所有可访问的项目信息，包括项目名称、类型、状态、成员等"),
+		mcp.WithNumber("page", mcp.Description("页码 - 可选，从1开始，默认为1")),
+		mcp.WithNumber("page_size", mcp.Description("每页数量 - 可选，默认20，最大100")),
 	)
 }
 
@@ -358,26 +358,26 @@ func (t *CreateProjectTool) GetDescription() string {
 // GetToolDefinition 返回工具定义
 func (t *CreateProjectTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
-		mcp.WithDescription(t.description),
+		mcp.WithDescription("创建新的PingCode项目 - 支持Scrum、Kanban、瀑布等项目类型，可设置项目名称、标识符、可见性等"),
 		mcp.WithString("name",
-			mcp.Description("项目名称"),
+			mcp.Description("项目名称 - 必填，项目的显示名称"),
 			mcp.Required(),
 		),
 		mcp.WithString("identifier",
-			mcp.Description("项目标识符（可选，如果为空将根据项目名称自动生成）"),
+			mcp.Description("项目标识符 - 可选，项目的唯一标识，如果为空将根据项目名称自动生成"),
 		),
 		mcp.WithString("type",
-			mcp.Description("项目类型 (scrum, kanban, waterfall)"),
+			mcp.Description("项目类型 - 必填，支持：scrum(敏捷)、kanban(看板)、waterfall(瀑布)"),
 			mcp.Required(),
 		),
 		mcp.WithString("visibility",
-			mcp.Description("项目可见性 (public, private)"),
+			mcp.Description("项目可见性 - 可选，支持：public(公开)、private(私有)，默认private"),
 		),
 		mcp.WithString("description",
-			mcp.Description("项目描述"),
+			mcp.Description("项目描述 - 可选，项目的详细描述信息"),
 		),
 		mcp.WithString("color",
-			mcp.Description("项目颜色（十六进制格式，如 #56ABFB）"),
+			mcp.Description("项目颜色 - 可选，十六进制格式，如：#56ABFB"),
 		),
 	)
 }
@@ -643,17 +643,17 @@ func (t *AddProjectMemberTool) GetDescription() string {
 // GetToolDefinition 返回工具定义
 func (t *AddProjectMemberTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
-		mcp.WithDescription(t.description),
+		mcp.WithDescription("添加项目成员 - 将指定用户添加到项目中，可设置成员类型和角色"),
 		mcp.WithString("project_id",
-			mcp.Description("项目ID"),
+			mcp.Description("项目ID - 必填，要添加成员的项目唯一标识，可通过get_project_list工具获取"),
 			mcp.Required(),
 		),
 		mcp.WithString("user_id",
-			mcp.Description("用户ID"),
+			mcp.Description("用户ID - 必填，要添加的用户唯一标识，可通过企业用户列表工具获取"),
 			mcp.Required(),
 		),
 		mcp.WithString("type",
-			mcp.Description("成员类型（可选）"),
+			mcp.Description("成员类型 - 可选，指定成员在项目中的类型"),
 		),
 	)
 }
@@ -872,13 +872,13 @@ func (t *RemoveProjectMemberTool) GetDescription() string {
 // GetToolDefinition 返回工具定义
 func (t *RemoveProjectMemberTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
-		mcp.WithDescription(t.description),
+		mcp.WithDescription("移除项目成员 - 从指定项目中移除用户，取消其项目访问权限"),
 		mcp.WithString("project_id",
-			mcp.Description("项目ID"),
+			mcp.Description("项目ID - 必填，要移除成员的项目唯一标识，可通过get_project_list工具获取"),
 			mcp.Required(),
 		),
 		mcp.WithString("user_id",
-			mcp.Description("用户ID"),
+			mcp.Description("用户ID - 必填，要移除的用户唯一标识，可通过get_project_members工具获取"),
 			mcp.Required(),
 		),
 	)
@@ -1068,16 +1068,16 @@ func (t *GetProjectMembersTool) GetDescription() string {
 // GetToolDefinition 返回工具定义
 func (t *GetProjectMembersTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
-		mcp.WithDescription(t.description),
+		mcp.WithDescription("获取项目成员列表 - 查看指定项目的所有成员信息，包括用户详情、角色、权限等"),
 		mcp.WithString("project_id",
-			mcp.Description("项目ID"),
+			mcp.Description("项目ID - 必填，要查询成员的项目唯一标识，可通过get_project_list工具获取"),
 			mcp.Required(),
 		),
 		mcp.WithNumber("page",
-			mcp.Description("页码，从1开始"),
+			mcp.Description("页码 - 可选，从1开始，默认为1"),
 		),
 		mcp.WithNumber("page_size",
-			mcp.Description("每页数量，最大100"),
+			mcp.Description("每页数量 - 可选，默认20，最大100"),
 		),
 	)
 }

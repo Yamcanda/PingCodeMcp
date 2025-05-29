@@ -46,15 +46,15 @@ func (t *TimeSearch) GetDescription() string {
 // GetToolDefinition 返回工具定义
 func (t *TimeSearch) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
-		mcp.WithDescription(t.description),
+		mcp.WithDescription("获取当前时间信息 - 支持多种时间格式和时区，包括标准格式、ISO、Unix时间戳等"),
 		mcp.WithString("format",
-			mcp.Description("时间格式类型 (default, iso, unix, rfc3339, custom)"),
+			mcp.Description("时间格式类型 - 可选，支持：default(默认)、iso(ISO8601)、unix(Unix时间戳)、rfc3339(RFC3339)、custom(自定义)"),
 		),
 		mcp.WithString("timezone",
-			mcp.Description("时区 (如: Asia/Shanghai, UTC, America/New_York)"),
+			mcp.Description("时区设置 - 可选，如：Asia/Shanghai(上海)、UTC(协调世界时)、America/New_York(纽约)，默认Asia/Shanghai"),
 		),
 		mcp.WithString("custom_format",
-			mcp.Description("自定义时间格式 (当format为custom时使用，Go时间格式)"),
+			mcp.Description("自定义时间格式 - 可选，仅当format为custom时使用，Go语言时间格式，如：2006-01-02 15:04:05"),
 		),
 	)
 }

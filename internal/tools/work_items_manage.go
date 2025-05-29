@@ -29,6 +29,7 @@ func init() {
 			NewListWorkItemsTool(),
 			NewDeleteWorkItemTool(),
 			NewListWorkItemStatesTool(),
+			NewListWorkItemPrioritiesTool(),
 		}
 	})
 }
@@ -172,27 +173,27 @@ func (t *CreateWorkItemTool) GetDescription() string {
 func (t *CreateWorkItemTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
 		mcp.WithDescription(t.description),
-		mcp.WithString("project_id", mcp.Description("项目的id"), mcp.Required()),
-		mcp.WithString("title", mcp.Description("工作项的标题"), mcp.Required()),
-		mcp.WithString("type_id", mcp.Description("工作项类型的id"), mcp.Required()),
-		mcp.WithString("assignee_id", mcp.Description("工作项负责人的id")),
-		mcp.WithString("board_id", mcp.Description("看板的id（项目类型为kanban时有效）")),
-		mcp.WithString("description", mcp.Description("工作项的描述")),
-		mcp.WithNumber("end_at", mcp.Description("工作项的截止时间（时间戳）")),
-		mcp.WithString("entry_id", mcp.Description("看板栏的id（项目类型为kanban时有效）")),
-		mcp.WithNumber("estimated_workload", mcp.Description("工作项的预估工时")),
-		mcp.WithString("parent_id", mcp.Description("工作项的父工作项的id")),
-		mcp.WithArray("participant_ids", mcp.Description("工作项关注人的id列表")),
-		mcp.WithString("priority_id", mcp.Description("工作项优先级的id")),
-		mcp.WithNumber("remaining_workload", mcp.Description("工作项的剩余工时")),
-		mcp.WithString("sprint_id", mcp.Description("所属迭代id（项目类型为scrum时有效）")),
-		mcp.WithNumber("start_at", mcp.Description("工作项的开始时间（时间戳）")),
-		mcp.WithString("state_id", mcp.Description("工作项状态的id")),
-		mcp.WithNumber("story_points", mcp.Description("工作项的故事点")),
-		mcp.WithString("swimlane_id", mcp.Description("泳道的id（项目类型为kanban时有效）")),
-		mcp.WithString("version_id", mcp.Description("所属发布的id")),
-		mcp.WithString("prop_a", mcp.Description("工作项属性prop_a")),
-		mcp.WithString("prop_b", mcp.Description("工作项属性prop_b")),
+		mcp.WithString("project_id", mcp.Description("项目ID - 必填，可通过get_project_list工具获取"), mcp.Required()),
+		mcp.WithString("title", mcp.Description("工作项标题 - 必填，简洁明了地描述工作项内容"), mcp.Required()),
+		mcp.WithString("type_id", mcp.Description("工作项类型ID - 必填，如：epic(史诗)、feature(特性)、story(用户故事)、task(任务)、bug(缺陷)"), mcp.Required()),
+		mcp.WithString("assignee_id", mcp.Description("负责人ID - 可选，不填则默认为当前用户，可通过get_project_members工具获取项目成员ID")),
+		mcp.WithString("board_id", mcp.Description("看板ID - 可选，仅在Kanban项目中使用")),
+		mcp.WithString("description", mcp.Description("工作项详细描述 - 可选，支持Markdown格式")),
+		mcp.WithNumber("end_at", mcp.Description("截止时间 - 可选，Unix时间戳格式，如：1735689600")),
+		mcp.WithString("entry_id", mcp.Description("看板栏ID - 可选，仅在Kanban项目中使用，指定工作项所在的看板栏")),
+		mcp.WithNumber("estimated_workload", mcp.Description("预估工时 - 可选，单位为小时，如：8.5")),
+		mcp.WithString("parent_id", mcp.Description("父工作项ID - 可选，用于创建子任务或建立层级关系")),
+		mcp.WithArray("participant_ids", mcp.Description("关注人ID列表 - 可选，数组格式，如：[\"user1\", \"user2\"]")),
+		mcp.WithString("priority_id", mcp.Description("优先级ID - 可选，设置工作项优先级，可通过list_work_item_priorities工具获取可用优先级ID")),
+		mcp.WithNumber("remaining_workload", mcp.Description("剩余工时 - 可选，单位为小时")),
+		mcp.WithString("sprint_id", mcp.Description("迭代ID - 可选，仅在Scrum项目中使用")),
+		mcp.WithNumber("start_at", mcp.Description("开始时间 - 可选，Unix时间戳格式，不填则默认为当前时间")),
+		mcp.WithString("state_id", mcp.Description("状态ID - 可选，可通过list_work_item_states工具获取可用状态")),
+		mcp.WithNumber("story_points", mcp.Description("故事点 - 可选，用于敏捷开发中的工作量估算")),
+		mcp.WithString("swimlane_id", mcp.Description("泳道ID - 可选，仅在Kanban项目中使用")),
+		mcp.WithString("version_id", mcp.Description("版本ID - 可选，关联到特定的发布版本")),
+		mcp.WithString("prop_a", mcp.Description("自定义属性A - 可选，项目特定的自定义字段")),
+		mcp.WithString("prop_b", mcp.Description("自定义属性B - 可选，项目特定的自定义字段")),
 	)
 }
 
@@ -226,6 +227,13 @@ func (t *CreateWorkItemTool) Handle(ctx context.Context, request mcp.CallToolReq
 			workItemRequest.AssigneeID = &currentUserID
 			requestLogger.With("assignee_id", currentUserID).Info("未指定负责人，已设置为当前用户")
 		}
+	}
+
+	// 如果没有指定开始时间，默认设置为当前时间
+	if workItemRequest.StartAt == nil {
+		currentTime := float64(time.Now().Unix())
+		workItemRequest.StartAt = &currentTime
+		requestLogger.With("start_at", currentTime).Info("未指定开始时间，已设置为当前时间")
 	}
 
 	respStr, err := t.doCreateWorkItemRequest(ctx, token, workItemRequest, requestLogger)
@@ -683,28 +691,28 @@ func (t *UpdateWorkItemTool) GetDescription() string {
 func (t *UpdateWorkItemTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
 		mcp.WithDescription(t.description),
-		mcp.WithString("work_item_id", mcp.Description("工作项的id"), mcp.Required()),
-		mcp.WithString("project_id", mcp.Description("项目的id")),
-		mcp.WithString("title", mcp.Description("工作项的标题")),
-		mcp.WithString("type_id", mcp.Description("工作项类型的id")),
-		mcp.WithString("description", mcp.Description("工作项的描述")),
-		mcp.WithNumber("start_at", mcp.Description("工作项的开始时间（时间戳）")),
-		mcp.WithNumber("end_at", mcp.Description("工作项的截止时间（时间戳）")),
-		mcp.WithString("state_id", mcp.Description("工作项状态的id")),
-		mcp.WithString("parent_id", mcp.Description("工作项的父工作项的id")),
-		mcp.WithString("sprint_id", mcp.Description("所属迭代id")),
-		mcp.WithString("version_id", mcp.Description("所属发布的id")),
-		mcp.WithString("board_id", mcp.Description("看板的id")),
-		mcp.WithString("entry_id", mcp.Description("看板栏的id")),
-		mcp.WithString("swimlane_id", mcp.Description("泳道的id")),
-		mcp.WithString("priority_id", mcp.Description("工作项优先级的id")),
-		mcp.WithString("assignee_id", mcp.Description("工作项负责人的id")),
-		mcp.WithArray("participant_ids", mcp.Description("工作项关注人的id列表")),
-		mcp.WithNumber("story_points", mcp.Description("工作项的故事点")),
-		mcp.WithNumber("estimated_workload", mcp.Description("工作项的预估工时")),
-		mcp.WithNumber("remaining_workload", mcp.Description("工作项的剩余工时")),
-		mcp.WithString("prop_a", mcp.Description("工作项属性prop_a")),
-		mcp.WithString("prop_b", mcp.Description("工作项属性prop_b")),
+		mcp.WithString("work_item_id", mcp.Description("工作项ID - 必填，要更新的工作项唯一标识，可通过list_work_items工具获取"), mcp.Required()),
+		mcp.WithString("project_id", mcp.Description("项目ID - 可选，更改工作项所属项目")),
+		mcp.WithString("title", mcp.Description("工作项标题 - 可选，更新工作项的标题")),
+		mcp.WithString("type_id", mcp.Description("工作项类型ID - 可选，更改工作项类型，如：epic、feature、story、task、bug")),
+		mcp.WithString("description", mcp.Description("工作项描述 - 可选，更新详细描述，支持Markdown格式")),
+		mcp.WithNumber("start_at", mcp.Description("开始时间 - 可选，Unix时间戳格式")),
+		mcp.WithNumber("end_at", mcp.Description("截止时间 - 可选，Unix时间戳格式")),
+		mcp.WithString("state_id", mcp.Description("状态ID - 可选，更改工作项状态，可通过list_work_item_states工具获取")),
+		mcp.WithString("parent_id", mcp.Description("父工作项ID - 可选，设置或更改父子关系")),
+		mcp.WithString("sprint_id", mcp.Description("迭代ID - 可选，分配到指定迭代（Scrum项目）")),
+		mcp.WithString("version_id", mcp.Description("版本ID - 可选，关联到特定发布版本")),
+		mcp.WithString("board_id", mcp.Description("看板ID - 可选，移动到指定看板（Kanban项目）")),
+		mcp.WithString("entry_id", mcp.Description("看板栏ID - 可选，移动到指定看板栏（Kanban项目）")),
+		mcp.WithString("swimlane_id", mcp.Description("泳道ID - 可选，移动到指定泳道（Kanban项目）")),
+		mcp.WithString("priority_id", mcp.Description("优先级ID - 可选，设置工作项优先级，可通过list_work_item_priorities工具获取可用优先级ID")),
+		mcp.WithString("assignee_id", mcp.Description("负责人ID - 可选，重新分配负责人")),
+		mcp.WithArray("participant_ids", mcp.Description("关注人ID列表 - 可选，更新关注人列表，数组格式")),
+		mcp.WithNumber("story_points", mcp.Description("故事点 - 可选，更新敏捷估算点数")),
+		mcp.WithNumber("estimated_workload", mcp.Description("预估工时 - 可选，单位为小时")),
+		mcp.WithNumber("remaining_workload", mcp.Description("剩余工时 - 可选，单位为小时")),
+		mcp.WithString("prop_a", mcp.Description("自定义属性A - 可选，项目特定的自定义字段")),
+		mcp.WithString("prop_b", mcp.Description("自定义属性B - 可选，项目特定的自定义字段")),
 	)
 }
 
@@ -1190,32 +1198,32 @@ func (t *ListWorkItemsTool) GetDescription() string {
 func (t *ListWorkItemsTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
 		mcp.WithDescription(t.description),
-		mcp.WithString("identifier", mcp.Description("工作项编号")),
-		mcp.WithString("project_ids", mcp.Description("项目的id，使用','分割，最多只能20个")),
-		mcp.WithString("type_ids", mcp.Description("工作项类型的id，使用','分割，最多只能20个,查询所有不用填写.")),
-		mcp.WithString("parent_ids", mcp.Description("父工作项的id，使用','分割，最多只能20个,查询所有不用填写.")),
-		mcp.WithString("assignee_ids", mcp.Description("工作项负责人的id，使用','分割，最多只能20个,查询所有不用填写.")),
-		mcp.WithString("state_ids", mcp.Description("工作项状态的id，使用','分割，最多只能20个,查询所有不用填写.")),
-		mcp.WithString("start_between", mcp.Description("开始时间介于的时间范围，通过','分割起始时间")),
-		mcp.WithString("end_between", mcp.Description("结束时间介于的时间范围，通过','分割起始时间")),
-		mcp.WithString("priority_ids", mcp.Description("工作项优先级的id，使用','分割，最多只能20个,查询所有不用填写.")),
-		mcp.WithString("bug_type_ids", mcp.Description("缺陷类别的id，使用','分割，最多只能20个,查询所有不用填写.")),
-		mcp.WithString("sprint_ids", mcp.Description("迭代的id，使用','分割，最多只能20个,查询所有不用填写.")),
-		mcp.WithString("board_ids", mcp.Description("看板的id，使用','分割，最多只能20个,查询所有不用填写.")),
-		mcp.WithString("entry_ids", mcp.Description("看板栏的id，使用','分割，最多只能20个,查询所有不用填写.")),
-		mcp.WithString("tag_ids", mcp.Description("工作项标签的id，使用','分割，最多只能20个,查询所有不用填写.")),
-		mcp.WithString("swimlane_ids", mcp.Description("泳道的id，使用','分割，最多只能20个,查询所有不用填写.")),
-		mcp.WithString("phase_ids", mcp.Description("所属计划的id，使用','分割，最多只能20个,查询所有不用填写.")),
-		mcp.WithString("version_ids", mcp.Description("发布的id，使用','分割，最多只能20个,查询所有不用填写.")),
-		mcp.WithString("created_by_ids", mcp.Description("创建人的id，使用','分割，最多只能20个,查询所有不用填写.")),
-		mcp.WithString("created_between", mcp.Description("创建时间介于的时间范围，通过','分割起始时间")),
-		mcp.WithString("updated_between", mcp.Description("更新时间介于的时间范围，通过','分割起始时间")),
-		mcp.WithString("participant_id", mcp.Description("工作项关注人的id")),
-		mcp.WithString("keywords", mcp.Description("关键字。支持工作项编号和工作项标题")),
-		mcp.WithString("include_deleted", mcp.Description("是否查询已删除的工作项。该值默认为false")),
-		mcp.WithString("include_archived", mcp.Description("是否查询已归档的工作项。该值默认为false")),
-		mcp.WithNumber("page_size", mcp.Description("每页数量，默认30")),
-		mcp.WithNumber("page_index", mcp.Description("页码，从0开始，默认0")),
+		mcp.WithString("identifier", mcp.Description("工作项编号 - 可选，精确匹配特定工作项编号")),
+		mcp.WithString("project_ids", mcp.Description("项目ID列表 - 可选，用逗号分隔，最多20个，如：'proj1,proj2'")),
+		mcp.WithString("type_ids", mcp.Description("工作项类型ID列表 - 可选，用逗号分隔，最多20个，如：'epic,story,task'")),
+		mcp.WithString("parent_ids", mcp.Description("父工作项ID列表 - 可选，用逗号分隔，最多20个，查询指定父工作项的子项")),
+		mcp.WithString("assignee_ids", mcp.Description("负责人ID列表 - 可选，用逗号分隔，最多20个，查询指定负责人的工作项")),
+		mcp.WithString("state_ids", mcp.Description("状态ID列表 - 可选，用逗号分隔，最多20个，如：'open,in_progress,done'")),
+		mcp.WithString("start_between", mcp.Description("开始时间范围 - 可选，用逗号分隔起止时间戳，如：'1735689600,1735776000'")),
+		mcp.WithString("end_between", mcp.Description("结束时间范围 - 可选，用逗号分隔起止时间戳，如：'1735689600,1735776000'")),
+		mcp.WithString("priority_ids", mcp.Description("优先级ID列表 - 可选，用逗号分隔，最多20个，可通过list_work_item_priorities工具获取可用优先级ID")),
+		mcp.WithString("bug_type_ids", mcp.Description("缺陷类别ID列表 - 可选，用逗号分隔，最多20个，仅适用于bug类型工作项")),
+		mcp.WithString("sprint_ids", mcp.Description("迭代ID列表 - 可选，用逗号分隔，最多20个，查询指定迭代的工作项")),
+		mcp.WithString("board_ids", mcp.Description("看板ID列表 - 可选，用逗号分隔，最多20个，仅适用于Kanban项目")),
+		mcp.WithString("entry_ids", mcp.Description("看板栏ID列表 - 可选，用逗号分隔，最多20个，仅适用于Kanban项目")),
+		mcp.WithString("tag_ids", mcp.Description("标签ID列表 - 可选，用逗号分隔，最多20个，查询带有指定标签的工作项")),
+		mcp.WithString("swimlane_ids", mcp.Description("泳道ID列表 - 可选，用逗号分隔，最多20个，仅适用于Kanban项目")),
+		mcp.WithString("phase_ids", mcp.Description("计划阶段ID列表 - 可选，用逗号分隔，最多20个，查询指定阶段的工作项")),
+		mcp.WithString("version_ids", mcp.Description("版本ID列表 - 可选，用逗号分隔，最多20个，查询指定版本的工作项")),
+		mcp.WithString("created_by_ids", mcp.Description("创建人ID列表 - 可选，用逗号分隔，最多20个，查询指定创建人的工作项")),
+		mcp.WithString("created_between", mcp.Description("创建时间范围 - 可选，用逗号分隔起止时间戳，如：'1735689600,1735776000'")),
+		mcp.WithString("updated_between", mcp.Description("更新时间范围 - 可选，用逗号分隔起止时间戳，如：'1735689600,1735776000'")),
+		mcp.WithString("participant_id", mcp.Description("关注人ID - 可选，查询指定用户关注的工作项")),
+		mcp.WithString("keywords", mcp.Description("关键字搜索 - 可选，支持工作项编号和标题的模糊搜索")),
+		mcp.WithString("include_deleted", mcp.Description("包含已删除项 - 可选，true/false，默认false")),
+		mcp.WithString("include_archived", mcp.Description("包含已归档项 - 可选，true/false，默认false")),
+		mcp.WithNumber("page_size", mcp.Description("每页数量 - 可选，默认30，最大100")),
+		mcp.WithNumber("page_index", mcp.Description("页码 - 可选，从0开始，默认0")),
 	)
 }
 
@@ -1563,7 +1571,7 @@ func (t *DeleteWorkItemTool) GetDescription() string {
 func (t *DeleteWorkItemTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
 		mcp.WithDescription(t.description),
-		mcp.WithString("work_item_id", mcp.Description("工作项的id"), mcp.Required()),
+		mcp.WithString("work_item_id", mcp.Description("工作项ID - 必填，要删除的工作项唯一标识，可通过list_work_items工具获取"), mcp.Required()),
 	)
 }
 
@@ -1793,8 +1801,8 @@ func (t *ListWorkItemStatesTool) GetDescription() string {
 func (t *ListWorkItemStatesTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
 		mcp.WithDescription(t.description),
-		mcp.WithString("project_id", mcp.Description("项目的id")),
-		mcp.WithString("work_item_type_id", mcp.Description("工作项的类型。瀑布项目下工作项的类型id或者非瀑布下的工作项类型：epic，feature，story，task，bug和issue")),
+		mcp.WithString("project_id", mcp.Description("项目ID - 可选，指定项目的唯一标识，可通过get_project_list工具获取")),
+		mcp.WithString("work_item_type_id", mcp.Description("工作项类型ID - 可选，瀑布项目使用具体类型ID，敏捷项目使用：epic、feature、story、task、bug、issue")),
 	)
 }
 
@@ -1909,6 +1917,129 @@ func (t *ListWorkItemStatesTool) formatListWorkItemStatesResponse(resp ListWorkI
 		}
 
 		result.WriteString(fmt.Sprintf("🔗 链接: %s\n", state.URL))
+		result.WriteString("\n")
+	}
+
+	return result.String()
+}
+
+// WorkItemPriority 工作项优先级结构
+type WorkItemPriority struct {
+	ID   string `json:"id"`
+	URL  string `json:"url"`
+	Name string `json:"name"`
+}
+
+// ListWorkItemPrioritiesResponse 获取工作项优先级列表的响应结构
+type ListWorkItemPrioritiesResponse struct {
+	PageSize  int                `json:"page_size"`
+	PageIndex int                `json:"page_index"`
+	Total     int                `json:"total"`
+	Values    []WorkItemPriority `json:"values"`
+}
+
+// ListWorkItemPrioritiesTool 获取工作项优先级列表工具
+type ListWorkItemPrioritiesTool struct {
+	name        string
+	description string
+}
+
+// NewListWorkItemPrioritiesTool 创建新的工作项优先级列表获取工具实例
+func NewListWorkItemPrioritiesTool() MCPTool {
+	return &ListWorkItemPrioritiesTool{
+		name:        "list_work_item_priorities",
+		description: "Get work item priorities list",
+	}
+}
+
+func (t *ListWorkItemPrioritiesTool) GetName() string {
+	return t.name
+}
+
+func (t *ListWorkItemPrioritiesTool) GetDescription() string {
+	return t.description
+}
+
+func (t *ListWorkItemPrioritiesTool) GetToolDefinition() mcp.Tool {
+	return mcp.NewTool(t.name,
+		mcp.WithDescription("获取工作项优先级列表 - 查看系统中所有可用的工作项优先级，用于创建或更新工作项时设置优先级"),
+	)
+}
+
+func (t *ListWorkItemPrioritiesTool) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	log := logger.New()
+	defer log.Sync()
+
+	requestLogger := log.With("tool", "list_work_item_priorities")
+	requestLogger.Info("开始获取工作项优先级列表")
+
+	token, err := auth.TokenFromContext(ctx)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	if !strings.HasPrefix(token, "Bearer ") {
+		token = "Bearer " + token
+	}
+
+	respStr, err := t.doListWorkItemPrioritiesRequest(ctx, token, requestLogger)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	var errorRes models.ErrorResponse
+	if err := json.Unmarshal([]byte(respStr), &errorRes); err == nil && errorRes.Code != "" {
+		requestLogger.With("success", false, "error", errorRes.Message).Error("获取工作项优先级列表API调用失败")
+		return mcp.NewToolResultError(errorRes.Message), nil
+	}
+
+	var resp ListWorkItemPrioritiesResponse
+	if err := json.Unmarshal([]byte(respStr), &resp); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("解析响应失败: %v", err)), nil
+	}
+
+	result := t.formatListWorkItemPrioritiesResponse(resp)
+	return mcp.NewToolResultText(result), nil
+}
+
+func (t *ListWorkItemPrioritiesTool) doListWorkItemPrioritiesRequest(ctx context.Context, token string, log *logger.Logger) (string, error) {
+	headers := map[string]string{
+		"Authorization": token,
+		"Accept":        "application/json",
+		"Content-Type":  "application/json",
+	}
+
+	timeoutCtx, cancel := context.WithTimeout(ctx, workItemTimeout)
+	defer cancel()
+
+	// 构建API URL
+	prioritiesAPIURL := baseUrl + "/v1/project/priorities"
+
+	body, _, err := utils.DoGet(timeoutCtx, prioritiesAPIURL, headers, nil)
+	if err != nil {
+		return "", fmt.Errorf("获取工作项优先级列表请求失败: %v", err)
+	}
+
+	log.With("url", prioritiesAPIURL, "response_size_bytes", len(body), "success", true).Debug("获取工作项优先级列表API请求成功")
+	return string(body), nil
+}
+
+func (t *ListWorkItemPrioritiesTool) formatListWorkItemPrioritiesResponse(resp ListWorkItemPrioritiesResponse) string {
+	var result strings.Builder
+	result.WriteString("📊 工作项优先级列表\n\n")
+	result.WriteString(fmt.Sprintf("📈 总计: %d 个优先级\n", resp.Total))
+	result.WriteString(fmt.Sprintf("📄 当前页: %d，每页: %d 个\n\n", resp.PageIndex+1, resp.PageSize))
+
+	if len(resp.Values) == 0 {
+		result.WriteString("暂无工作项优先级数据\n")
+		return result.String()
+	}
+
+	for i, priority := range resp.Values {
+		result.WriteString(fmt.Sprintf("--- 优先级 %d ---\n", i+1))
+		result.WriteString(fmt.Sprintf("🆔 ID: %s\n", priority.ID))
+		result.WriteString(fmt.Sprintf("📋 名称: %s\n", priority.Name))
+		result.WriteString(fmt.Sprintf("🔗 链接: %s\n", priority.URL))
 		result.WriteString("\n")
 	}
 

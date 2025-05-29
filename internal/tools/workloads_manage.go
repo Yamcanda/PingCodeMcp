@@ -128,14 +128,14 @@ func (t *CreateWorkloadTool) GetDescription() string {
 
 func (t *CreateWorkloadTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
-		mcp.WithDescription(t.description),
-		mcp.WithString("principal_id", mcp.Description("工时主体的id"), mcp.Required()),
-		mcp.WithString("principal_type", mcp.Description("工时主体的类型。允许值: work_item"), mcp.Required()),
-		mcp.WithString("type_id", mcp.Description("工时类型的id"), mcp.Required()),
-		mcp.WithNumber("duration", mcp.Description("工时的时长。单位是小时，数值可以是为0-24之间，最多包含一位小数的正数"), mcp.Required()),
-		mcp.WithNumber("report_at", mcp.Description("工时的登记日期。该值为十位数字组成的时间戳，会被转换为该时间当天的零点零分零秒，默认为当天")),
-		mcp.WithString("report_by_id", mcp.Description("工时的登记人，企业鉴权时必填。个人鉴权时不需要传递，即使传递了也会被忽略")),
-		mcp.WithString("description", mcp.Description("工时的说明")),
+		mcp.WithDescription("创建工时记录 - 为工作项记录工作时长，支持设置工时类型、时长、登记日期等"),
+		mcp.WithString("principal_id", mcp.Description("工时主体ID - 必填，通常是工作项ID，可通过list_work_items工具获取"), mcp.Required()),
+		mcp.WithString("principal_type", mcp.Description("工时主体类型 - 必填，目前仅支持：work_item"), mcp.Required()),
+		mcp.WithString("type_id", mcp.Description("工时类型ID - 必填，工时分类标识，可通过get_workload_types工具获取"), mcp.Required()),
+		mcp.WithNumber("duration", mcp.Description("工时时长 - 必填，单位为小时，范围0-24，最多一位小数，如：8.5"), mcp.Required()),
+		mcp.WithNumber("report_at", mcp.Description("登记日期 - 可选，Unix时间戳，默认为当天零点")),
+		mcp.WithString("report_by_id", mcp.Description("登记人ID - 可选，企业鉴权时必填，个人鉴权时忽略")),
+		mcp.WithString("description", mcp.Description("工时说明 - 可选，工时记录的详细描述")),
 	)
 }
 
@@ -386,7 +386,7 @@ func (t *GetWorkloadTypesTool) GetDescription() string {
 
 func (t *GetWorkloadTypesTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
-		mcp.WithDescription(t.description),
+		mcp.WithDescription("获取工时类型列表 - 查看系统中所有可用的工时分类，用于创建工时记录时选择类型"),
 	)
 }
 
@@ -500,8 +500,8 @@ func (t *DeleteWorkloadTool) GetDescription() string {
 
 func (t *DeleteWorkloadTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
-		mcp.WithDescription(t.description),
-		mcp.WithString("workload_id", mcp.Description("工时的ID"), mcp.Required()),
+		mcp.WithDescription("删除工时记录 - 删除指定的工时记录，操作不可逆"),
+		mcp.WithString("workload_id", mcp.Description("工时记录ID - 必填，要删除的工时记录唯一标识，可通过list_workloads工具获取"), mcp.Required()),
 	)
 }
 
@@ -643,12 +643,12 @@ func (t *ListWorkloadsTool) GetDescription() string {
 
 func (t *ListWorkloadsTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
-		mcp.WithDescription(t.description),
-		mcp.WithString("principal_type", mcp.Description("工时主体的类型。允许值: work_item，默认为 work_item")),
-		mcp.WithString("principal_id", mcp.Description("工时主体的id"), mcp.Required()),
-		mcp.WithNumber("start_at", mcp.Description("登记日期查询的起始时间（时间戳）")),
-		mcp.WithNumber("end_at", mcp.Description("登记日期查询的结束时间（时间戳）")),
-		mcp.WithString("report_by_id", mcp.Description("登记人的id")),
+		mcp.WithDescription("获取工时记录列表 - 查询指定工作项的工时记录，支持按时间范围和登记人筛选"),
+		mcp.WithString("principal_type", mcp.Description("工时主体类型 - 可选，目前仅支持：work_item，默认为work_item")),
+		mcp.WithString("principal_id", mcp.Description("工时主体ID - 必填，通常是工作项ID，可通过list_work_items工具获取"), mcp.Required()),
+		mcp.WithNumber("start_at", mcp.Description("起始时间 - 可选，Unix时间戳，查询此时间之后的工时记录")),
+		mcp.WithNumber("end_at", mcp.Description("结束时间 - 可选，Unix时间戳，查询此时间之前的工时记录")),
+		mcp.WithString("report_by_id", mcp.Description("登记人ID - 可选，筛选指定用户登记的工时记录")),
 	)
 }
 
@@ -886,13 +886,13 @@ func (t *UpdateWorkloadTool) GetDescription() string {
 
 func (t *UpdateWorkloadTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
-		mcp.WithDescription(t.description),
-		mcp.WithString("workload_id", mcp.Description("工时的id"), mcp.Required()),
-		mcp.WithString("type_id", mcp.Description("工时类型的id")),
-		mcp.WithNumber("duration", mcp.Description("工时的时长。单位是小时，数值可以是为0-24之间，最多包含一位小数的正数")),
-		mcp.WithNumber("report_at", mcp.Description("工时的登记日期。该值为十位数字组成的时间戳，会被转换为该时间当天的零点零分零秒，默认为当天")),
-		mcp.WithString("report_by_id", mcp.Description("工时的登记人，企业鉴权时必填。个人鉴权时不需要传递，即使传递了也会被忽略")),
-		mcp.WithString("description", mcp.Description("工时的说明")),
+		mcp.WithDescription("更新工时记录 - 修改已存在的工时记录信息，包括时长、类型、日期等"),
+		mcp.WithString("workload_id", mcp.Description("工时记录ID - 必填，要更新的工时记录唯一标识，可通过list_workloads工具获取"), mcp.Required()),
+		mcp.WithString("type_id", mcp.Description("工时类型ID - 可选，更改工时分类，可通过get_workload_types工具获取")),
+		mcp.WithNumber("duration", mcp.Description("工时时长 - 可选，单位为小时，范围0-24，最多一位小数，如：8.5")),
+		mcp.WithNumber("report_at", mcp.Description("登记日期 - 可选，Unix时间戳，更改工时登记日期")),
+		mcp.WithString("report_by_id", mcp.Description("登记人ID - 可选，企业鉴权时可用，个人鉴权时忽略")),
+		mcp.WithString("description", mcp.Description("工时说明 - 可选，更新工时记录的详细描述")),
 	)
 }
 
