@@ -66,7 +66,7 @@ PingCode MCP 服务器实现了 Model Context Protocol 规范，为 AI 助手提
 
 ```bash
 # 克隆项目
-git clone https://github.com/your-repo/PingCodeMcp.git
+git clone https://github.com/peach-zhang/PingCodeMcp.git
 cd PingCodeMcp
 
 # 下载依赖
