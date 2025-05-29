@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	workItemsAPIURL = baseUrl + "/v1/project/work_items"
-	workItemTimeout = 15 * time.Second
+	workItemsAPIURL      = baseUrl + "/v1/project/work_items"
+	workItemStatesAPIURL = baseUrl + "/v1/project/work_item/states"
+	workItemTimeout      = 15 * time.Second
 )
 
 func init() {
@@ -27,6 +28,7 @@ func init() {
 			NewUpdateWorkItemTool(),
 			NewListWorkItemsTool(),
 			NewDeleteWorkItemTool(),
+			NewListWorkItemStatesTool(),
 		}
 	})
 }
@@ -1190,22 +1192,22 @@ func (t *ListWorkItemsTool) GetToolDefinition() mcp.Tool {
 		mcp.WithDescription(t.description),
 		mcp.WithString("identifier", mcp.Description("工作项编号")),
 		mcp.WithString("project_ids", mcp.Description("项目的id，使用','分割，最多只能20个")),
-		mcp.WithString("type_ids", mcp.Description("工作项类型的id，使用','分割，最多只能20个")),
-		mcp.WithString("parent_ids", mcp.Description("父工作项的id，使用','分割，最多只能20个")),
-		mcp.WithString("assignee_ids", mcp.Description("工作项负责人的id，使用','分割，最多只能20个")),
-		mcp.WithString("state_ids", mcp.Description("工作项状态的id，使用','分割，最多只能20个")),
+		mcp.WithString("type_ids", mcp.Description("工作项类型的id，使用','分割，最多只能20个,查询所有不用填写.")),
+		mcp.WithString("parent_ids", mcp.Description("父工作项的id，使用','分割，最多只能20个,查询所有不用填写.")),
+		mcp.WithString("assignee_ids", mcp.Description("工作项负责人的id，使用','分割，最多只能20个,查询所有不用填写.")),
+		mcp.WithString("state_ids", mcp.Description("工作项状态的id，使用','分割，最多只能20个,查询所有不用填写.")),
 		mcp.WithString("start_between", mcp.Description("开始时间介于的时间范围，通过','分割起始时间")),
 		mcp.WithString("end_between", mcp.Description("结束时间介于的时间范围，通过','分割起始时间")),
-		mcp.WithString("priority_ids", mcp.Description("工作项优先级的id，使用','分割，最多只能20个")),
-		mcp.WithString("bug_type_ids", mcp.Description("缺陷类别的id，使用','分割，最多只能20个")),
-		mcp.WithString("sprint_ids", mcp.Description("迭代的id，使用','分割，最多只能20个")),
-		mcp.WithString("board_ids", mcp.Description("看板的id，使用','分割，最多只能20个")),
-		mcp.WithString("entry_ids", mcp.Description("看板栏的id，使用','分割，最多只能20个")),
-		mcp.WithString("tag_ids", mcp.Description("工作项标签的id，使用','分割，最多只能20个")),
-		mcp.WithString("swimlane_ids", mcp.Description("泳道的id，使用','分割，最多只能20个")),
-		mcp.WithString("phase_ids", mcp.Description("所属计划的id，使用','分割，最多只能20个")),
-		mcp.WithString("version_ids", mcp.Description("发布的id，使用','分割，最多只能20个")),
-		mcp.WithString("created_by_ids", mcp.Description("创建人的id，使用','分割，最多只能20个")),
+		mcp.WithString("priority_ids", mcp.Description("工作项优先级的id，使用','分割，最多只能20个,查询所有不用填写.")),
+		mcp.WithString("bug_type_ids", mcp.Description("缺陷类别的id，使用','分割，最多只能20个,查询所有不用填写.")),
+		mcp.WithString("sprint_ids", mcp.Description("迭代的id，使用','分割，最多只能20个,查询所有不用填写.")),
+		mcp.WithString("board_ids", mcp.Description("看板的id，使用','分割，最多只能20个,查询所有不用填写.")),
+		mcp.WithString("entry_ids", mcp.Description("看板栏的id，使用','分割，最多只能20个,查询所有不用填写.")),
+		mcp.WithString("tag_ids", mcp.Description("工作项标签的id，使用','分割，最多只能20个,查询所有不用填写.")),
+		mcp.WithString("swimlane_ids", mcp.Description("泳道的id，使用','分割，最多只能20个,查询所有不用填写.")),
+		mcp.WithString("phase_ids", mcp.Description("所属计划的id，使用','分割，最多只能20个,查询所有不用填写.")),
+		mcp.WithString("version_ids", mcp.Description("发布的id，使用','分割，最多只能20个,查询所有不用填写.")),
+		mcp.WithString("created_by_ids", mcp.Description("创建人的id，使用','分割，最多只能20个,查询所有不用填写.")),
 		mcp.WithString("created_between", mcp.Description("创建时间介于的时间范围，通过','分割起始时间")),
 		mcp.WithString("updated_between", mcp.Description("更新时间介于的时间范围，通过','分割起始时间")),
 		mcp.WithString("participant_id", mcp.Description("工作项关注人的id")),
@@ -1238,6 +1240,12 @@ func (t *ListWorkItemsTool) Handle(ctx context.Context, request mcp.CallToolRequ
 	respStr, err := t.doListWorkItemsRequest(ctx, token, queryParams, requestLogger)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	var errorRes models.ErrorResponse
+	if err := json.Unmarshal([]byte(respStr), &errorRes); err == nil && errorRes.Code != "" {
+		requestLogger.With("success", false, "error", errorRes.Message).Error("获取工作项列表API调用失败")
+		return mcp.NewToolResultError(errorRes.Message), nil
 	}
 
 	var resp ListWorkItemsResponse
@@ -1307,6 +1315,12 @@ func (t *ListWorkItemsTool) doListWorkItemsRequest(ctx context.Context, token st
 	body, _, err := utils.DoGet(timeoutCtx, workItemsAPIURL, headers, queryParams)
 	if err != nil {
 		return "", fmt.Errorf("获取工作项列表请求失败: %v", err)
+	}
+
+	var errorRes models.ErrorResponse
+	if err := json.Unmarshal(body, &errorRes); err == nil && errorRes.Code != "" {
+		log.Error("获取工作项列表请求失败", "error", err)
+		return "", fmt.Errorf("获取工作项列表请求失败: %s", errorRes.Message)
 	}
 
 	log.With("url", workItemsAPIURL, "response_size_bytes", len(body), "success", true).Debug("获取工作项列表API请求成功")
@@ -1579,6 +1593,12 @@ func (t *DeleteWorkItemTool) Handle(ctx context.Context, request mcp.CallToolReq
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
+	var errorRes models.ErrorResponse
+	if err := json.Unmarshal([]byte(respStr), &errorRes); err == nil && errorRes.Code != "" {
+		requestLogger.With("success", false, "error", errorRes.Message).Error("删除工作项API调用失败")
+		return mcp.NewToolResultError(errorRes.Message), nil
+	}
+
 	var resp DeleteWorkItemResponse
 	if err := json.Unmarshal([]byte(respStr), &resp); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("解析响应失败: %v", err)), nil
@@ -1726,6 +1746,171 @@ func (t *DeleteWorkItemTool) formatDeleteWorkItemResponse(resp DeleteWorkItemRes
 	result.WriteString(fmt.Sprintf("🔗 工作项链接: %s\n", resp.URL))
 
 	result.WriteString("\n⚠️ 注意: 工作项已被标记为删除状态，但数据仍保留在系统中。\n")
+
+	return result.String()
+}
+
+// WorkItemState 工作项状态结构
+type WorkItemState struct {
+	ID       string `json:"id"`
+	URL      string `json:"url"`
+	Name     string `json:"name"`
+	Type     string `json:"type"`
+	Color    string `json:"color"`
+	IsSystem bool   `json:"is_system"`
+}
+
+// ListWorkItemStatesResponse 获取工作项状态列表的响应结构
+type ListWorkItemStatesResponse struct {
+	PageSize  int             `json:"page_size"`
+	PageIndex int             `json:"page_index"`
+	Total     int             `json:"total"`
+	Values    []WorkItemState `json:"values"`
+}
+
+// ListWorkItemStatesTool 获取工作项状态列表工具
+type ListWorkItemStatesTool struct {
+	name        string
+	description string
+}
+
+// NewListWorkItemStatesTool 创建新的工作项状态列表获取工具实例
+func NewListWorkItemStatesTool() MCPTool {
+	return &ListWorkItemStatesTool{
+		name:        "list_work_item_states",
+		description: "Get work item states list",
+	}
+}
+
+func (t *ListWorkItemStatesTool) GetName() string {
+	return t.name
+}
+
+func (t *ListWorkItemStatesTool) GetDescription() string {
+	return t.description
+}
+
+func (t *ListWorkItemStatesTool) GetToolDefinition() mcp.Tool {
+	return mcp.NewTool(t.name,
+		mcp.WithDescription(t.description),
+		mcp.WithString("project_id", mcp.Description("项目的id")),
+		mcp.WithString("work_item_type_id", mcp.Description("工作项的类型。瀑布项目下工作项的类型id或者非瀑布下的工作项类型：epic，feature，story，task，bug和issue")),
+	)
+}
+
+func (t *ListWorkItemStatesTool) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	log := logger.New()
+	defer log.Sync()
+
+	requestLogger := log.With("tool", "list_work_item_states")
+	requestLogger.Info("开始获取工作项状态列表")
+
+	token, err := auth.TokenFromContext(ctx)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	if !strings.HasPrefix(token, "Bearer ") {
+		token = "Bearer " + token
+	}
+
+	queryParams := t.parseListWorkItemStatesArguments(request.GetArguments())
+
+	respStr, err := t.doListWorkItemStatesRequest(ctx, token, queryParams, requestLogger)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	var errorRes models.ErrorResponse
+	if err := json.Unmarshal([]byte(respStr), &errorRes); err == nil && errorRes.Code != "" {
+		requestLogger.With("success", false, "error", errorRes.Message).Error("获取工作项状态列表API调用失败")
+		return mcp.NewToolResultError(errorRes.Message), nil
+	}
+
+	var resp ListWorkItemStatesResponse
+	if err := json.Unmarshal([]byte(respStr), &resp); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("解析响应失败: %v", err)), nil
+	}
+
+	result := t.formatListWorkItemStatesResponse(resp)
+	return mcp.NewToolResultText(result), nil
+}
+
+func (t *ListWorkItemStatesTool) parseListWorkItemStatesArguments(args interface{}) map[string]string {
+	queryParams := make(map[string]string)
+
+	if args == nil {
+		return queryParams
+	}
+
+	argsMap, ok := args.(map[string]interface{})
+	if !ok {
+		return queryParams
+	}
+
+	// 解析项目ID参数
+	if projectID, exists := argsMap["project_id"]; exists {
+		if str, ok := projectID.(string); ok && str != "" {
+			queryParams["project_id"] = str
+		}
+	}
+
+	// 解析工作项类型ID参数
+	if workItemTypeID, exists := argsMap["work_item_type_id"]; exists {
+		if str, ok := workItemTypeID.(string); ok && str != "" {
+			queryParams["work_item_type_id"] = str
+		}
+	}
+
+	return queryParams
+}
+
+func (t *ListWorkItemStatesTool) doListWorkItemStatesRequest(ctx context.Context, token string, queryParams map[string]string, log *logger.Logger) (string, error) {
+	headers := map[string]string{
+		"Authorization": token,
+		"Accept":        "application/json",
+		"Content-Type":  "application/json",
+	}
+
+	timeoutCtx, cancel := context.WithTimeout(ctx, workItemTimeout)
+	defer cancel()
+
+	body, _, err := utils.DoGet(timeoutCtx, workItemStatesAPIURL, headers, queryParams)
+	if err != nil {
+		return "", fmt.Errorf("获取工作项状态列表请求失败: %v", err)
+	}
+
+	log.With("url", workItemStatesAPIURL, "response_size_bytes", len(body), "success", true).Debug("获取工作项状态列表API请求成功")
+	return string(body), nil
+}
+
+func (t *ListWorkItemStatesTool) formatListWorkItemStatesResponse(resp ListWorkItemStatesResponse) string {
+	var result strings.Builder
+	result.WriteString("📊 工作项状态列表\n\n")
+	result.WriteString(fmt.Sprintf("📈 总计: %d 个状态\n", resp.Total))
+	result.WriteString(fmt.Sprintf("📄 当前页: %d，每页: %d 个\n\n", resp.PageIndex+1, resp.PageSize))
+
+	if len(resp.Values) == 0 {
+		result.WriteString("暂无工作项状态数据\n")
+		return result.String()
+	}
+
+	for i, state := range resp.Values {
+		result.WriteString(fmt.Sprintf("--- 状态 %d ---\n", i+1))
+		result.WriteString(fmt.Sprintf("🆔 ID: %s\n", state.ID))
+		result.WriteString(fmt.Sprintf("📋 名称: %s\n", state.Name))
+		result.WriteString(fmt.Sprintf("📊 类型: %s\n", state.Type))
+		result.WriteString(fmt.Sprintf("🎨 颜色: %s\n", state.Color))
+
+		if state.IsSystem {
+			result.WriteString("⚙️ 系统状态: 是\n")
+		} else {
+			result.WriteString("⚙️ 系统状态: 否\n")
+		}
+
+		result.WriteString(fmt.Sprintf("🔗 链接: %s\n", state.URL))
+		result.WriteString("\n")
+	}
 
 	return result.String()
 }

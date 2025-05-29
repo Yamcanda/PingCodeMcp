@@ -9,6 +9,7 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 // Logger wraps zap logger with additional functionality
@@ -40,6 +41,7 @@ func GetGlobalLogger() *Logger {
 				Output:   "both",
 				Rotation: config.RotationConfig{Enabled: true, Daily: true},
 				File: config.FileLogConfig{
+					Path:       "logs",
 					Compress:   true,
 					Filename:   "PingCodeMcp.log",
 					MaxAge:     7,
@@ -55,67 +57,96 @@ func GetGlobalLogger() *Logger {
 
 // NewWithConfig 根据配置创建日志器
 func NewWithConfig(config *config.Config) *Logger {
+	logConfig := config.GetLogConfig()
+
 	// 确保日志目录存在
-	if err := os.MkdirAll(config.GetLogConfig().Path, 0755); err != nil {
+	if err := os.MkdirAll(logConfig.Path, 0755); err != nil {
 		panic("Failed to create logs directory: " + err.Error())
 	}
 
-	// 创建日志文件路径
-	var logFile string
-	if config.GetLogConfig().Daily {
-		// 按日期生成文件名
-		timestamp := time.Now().Format("2006-01-02")
-		filename := fmt.Sprintf("%s-%s.log",
-			config.GetLogConfig().Filename[:len(config.GetLogConfig().Filename)-4], // 移除.log扩展名
-			timestamp)
-		logFile = filepath.Join(config.GetLogConfig().Path, filename)
-	} else {
-		logFile = filepath.Join(config.GetLogConfig().Path, config.GetLogConfig().Filename)
+	// 创建核心编码器配置
+	encoderConfig := zapcore.EncoderConfig{
+		TimeKey:        "timestamp",
+		LevelKey:       "level",
+		NameKey:        "logger",
+		CallerKey:      "caller",
+		MessageKey:     "message",
+		StacktraceKey:  "stacktrace",
+		LineEnding:     zapcore.DefaultLineEnding,
+		EncodeLevel:    zapcore.LowercaseLevelEncoder,
+		EncodeTime:     zapcore.ISO8601TimeEncoder,
+		EncodeDuration: zapcore.SecondsDurationEncoder,
+		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
 
-	// 根据格式选择配置
-	var zapConfig zap.Config
-	if config.GetLogConfig().Format == "json" {
-		zapConfig = zap.NewProductionConfig()
+	// 根据格式选择编码器
+	var encoder zapcore.Encoder
+	if logConfig.Format == "json" {
+		encoder = zapcore.NewJSONEncoder(encoderConfig)
 	} else {
-		zapConfig = zap.NewDevelopmentConfig()
+		encoder = zapcore.NewConsoleEncoder(encoderConfig)
 	}
 
 	// 设置日志级别
-	level, err := zapcore.ParseLevel(config.GetLogConfig().Level)
+	level, err := zapcore.ParseLevel(logConfig.Level)
 	if err != nil {
 		level = zapcore.InfoLevel
 	}
-	zapConfig.Level = zap.NewAtomicLevelAt(level)
 
-	// 设置输出路径
-	switch config.GetLogConfig().Output {
-	case "console":
-		zapConfig.OutputPaths = []string{"stdout"}
-		zapConfig.ErrorOutputPaths = []string{"stderr"}
-	case "file":
-		zapConfig.OutputPaths = []string{logFile}
-		zapConfig.ErrorOutputPaths = []string{logFile}
-	case "both":
-		zapConfig.OutputPaths = []string{"stdout", logFile}
-		zapConfig.ErrorOutputPaths = []string{"stderr", logFile}
-	default:
-		zapConfig.OutputPaths = []string{"stdout", logFile}
-		zapConfig.ErrorOutputPaths = []string{"stderr", logFile}
+	var cores []zapcore.Core
+
+	// 控制台输出
+	if logConfig.Output == "console" || logConfig.Output == "both" {
+		consoleCore := zapcore.NewCore(
+			encoder,
+			zapcore.AddSync(os.Stdout),
+			level,
+		)
+		cores = append(cores, consoleCore)
 	}
 
-	// 自定义编码器配置
-	zapConfig.EncoderConfig.TimeKey = "timestamp"
-	zapConfig.EncoderConfig.LevelKey = "level"
-	zapConfig.EncoderConfig.MessageKey = "message"
-	zapConfig.EncoderConfig.CallerKey = "caller"
-	zapConfig.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	// 文件输出
+	if logConfig.Output == "file" || logConfig.Output == "both" {
+		var fileWriter zapcore.WriteSyncer
 
-	// 创建logger
-	logger, err := zapConfig.Build(zap.AddCallerSkip(1))
-	if err != nil {
-		panic("Failed to initialize logger: " + err.Error())
+		if logConfig.Daily {
+			// 使用lumberjack实现每日轮转
+			lumberJackLogger := &lumberjack.Logger{
+				Filename: filepath.Join(logConfig.Path, generateDailyFilename(logConfig.Filename)),
+				MaxSize:  logConfig.MaxSize, // MB
+				MaxAge:   logConfig.MaxAge,  // days
+				Compress: logConfig.Compress,
+			}
+
+			// 创建一个自定义的WriteSyncer来处理每日轮转
+			fileWriter = &dailyRotateWriter{
+				logger:   lumberJackLogger,
+				config:   logConfig,
+				lastDate: time.Now().Format("2006-01-02"),
+			}
+		} else {
+			// 普通文件输出
+			lumberJackLogger := &lumberjack.Logger{
+				Filename:   filepath.Join(logConfig.Path, logConfig.Filename),
+				MaxSize:    logConfig.MaxSize,
+				MaxBackups: logConfig.MaxBackups,
+				MaxAge:     logConfig.MaxAge,
+				Compress:   logConfig.Compress,
+			}
+			fileWriter = zapcore.AddSync(lumberJackLogger)
+		}
+
+		fileCore := zapcore.NewCore(
+			encoder,
+			fileWriter,
+			level,
+		)
+		cores = append(cores, fileCore)
 	}
+
+	// 创建多核心logger
+	core := zapcore.NewTee(cores...)
+	logger := zap.New(core, zap.AddCaller(), zap.AddCallerSkip(1))
 
 	sugar := logger.Sugar()
 	sugar = sugar.With("service", config.Server.Name)
@@ -124,6 +155,41 @@ func NewWithConfig(config *config.Config) *Logger {
 		SugaredLogger: sugar,
 	}
 	return globalLogger
+}
+
+// dailyRotateWriter 实现每日轮转的WriteSyncer
+type dailyRotateWriter struct {
+	logger   *lumberjack.Logger
+	config   *config.LogConfig
+	lastDate string
+}
+
+func (w *dailyRotateWriter) Write(p []byte) (n int, err error) {
+	currentDate := time.Now().Format("2006-01-02")
+
+	// 检查是否需要切换到新的日志文件
+	if currentDate != w.lastDate {
+		// 关闭当前文件
+		w.logger.Close()
+
+		// 更新文件名
+		w.logger.Filename = filepath.Join(w.config.Path, generateDailyFilename(w.config.Filename))
+		w.lastDate = currentDate
+	}
+
+	return w.logger.Write(p)
+}
+
+func (w *dailyRotateWriter) Sync() error {
+	return nil // lumberjack doesn't support sync
+}
+
+// generateDailyFilename 生成带日期的文件名
+func generateDailyFilename(originalFilename string) string {
+	timestamp := time.Now().Format("2006-01-02")
+	ext := filepath.Ext(originalFilename)
+	nameWithoutExt := originalFilename[:len(originalFilename)-len(ext)]
+	return fmt.Sprintf("%s-%s%s", nameWithoutExt, timestamp, ext)
 }
 
 // Info logs an info message
