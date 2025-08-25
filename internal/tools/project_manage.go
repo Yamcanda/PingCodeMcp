@@ -52,34 +52,27 @@ type Member struct {
 	Role *Role  `json:"role,omitempty"` // 角色信息，可选
 }
 
-type ProjectState struct {
-	ID   string `json:"id"`
-	URL  string `json:"url"`
-	Name string `json:"name"`
-	Type string `json:"type"`
-}
-
 type Project struct {
-	ID          string       `json:"id"`
-	URL         string       `json:"url"`
-	Visibility  string       `json:"visibility"`
-	Name        string       `json:"name"`
-	Type        string       `json:"type"`
-	Identifier  string       `json:"identifier"`
-	Color       string       `json:"color"`
-	Description string       `json:"description"`
-	Members     []Member     `json:"members"`
-	State       ProjectState `json:"state"`
-	Assignee    *User        `json:"assignee"`
-	ScopeType   string       `json:"scope_type"`
-	StartAt     *int64       `json:"start_at"`
-	EndAt       *int64       `json:"end_at"`
-	CreatedAt   int64        `json:"created_at"`
-	CreatedBy   User         `json:"created_by"`
-	UpdatedAt   int64        `json:"updated_at"`
-	UpdatedBy   User         `json:"updated_by"`
-	IsArchived  int          `json:"is_archived"`
-	IsDeleted   int          `json:"is_deleted"`
+	ID          string   `json:"id"`
+	URL         string   `json:"url"`
+	Visibility  string   `json:"visibility"`
+	Name        string   `json:"name"`
+	Type        string   `json:"type"`
+	Identifier  string   `json:"identifier"`
+	Color       string   `json:"color"`
+	Description string   `json:"description"`
+	Members     []Member `json:"members"`
+	State       string   `json:"state"`
+	Assignee    *User    `json:"assignee"`
+	ScopeType   string   `json:"scope_type"`
+	StartAt     *int64   `json:"start_at"`
+	EndAt       *int64   `json:"end_at"`
+	CreatedAt   int64    `json:"created_at"`
+	CreatedBy   User     `json:"created_by"`
+	UpdatedAt   int64    `json:"updated_at"`
+	UpdatedBy   User     `json:"updated_by"`
+	IsArchived  int      `json:"is_archived"`
+	IsDeleted   int      `json:"is_deleted"`
 }
 
 type ProjectListResponse struct {
@@ -97,7 +90,7 @@ type ProjectListTool struct {
 func NewProjectListTool() MCPTool {
 	return &ProjectListTool{
 		name:        "get_project_list",
-		description: "Get the list of PingCode projects",
+		description: "获取 PingCode 项目列表 - 查看所有可访问的项目信息，包括项目名称、项目标识、类型、状态、成员等",
 	}
 }
 
@@ -111,9 +104,13 @@ func (t *ProjectListTool) GetDescription() string {
 
 func (t *ProjectListTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
-		mcp.WithDescription("获取PingCode项目列表 - 查看所有可访问的项目信息，包括项目名称、类型、状态、成员等"),
-		mcp.WithNumber("page", mcp.Description("页码 - 可选，从1开始，默认为1")),
-		mcp.WithNumber("page_size", mcp.Description("每页数量 - 可选，默认20，最大100")),
+		mcp.WithDescription(t.description),
+		mcp.WithString("identifier", mcp.Description("项目的标识 - 可选，项目的唯一标识")),
+		mcp.WithString("type", mcp.Description("项目的类型 - 允许值: scrum, kanban, waterfall, hybrid")),
+		mcp.WithBoolean("include_deleted", mcp.Description("是否查询已删除的项目 - 可选，该值默认为false")),
+		mcp.WithBoolean("include_archived", mcp.Description("是否查询已归档的项目 - 可选，该值默认为false")),
+		mcp.WithNumber("page_index", mcp.Description("页码 - 可选，从0开始，默认为为0时，表示第一页")),
+		mcp.WithNumber("page_size", mcp.Description("每页数量 - 可选，默认30，最大100")),
 	)
 }
 
@@ -156,8 +153,7 @@ func (t *ProjectListTool) Handle(ctx context.Context, request mcp.CallToolReques
 
 func (t *ProjectListTool) parseArguments(args interface{}) map[string]string {
 	params := map[string]string{
-		"page_index": "0",
-		"page_size":  "20",
+		"page_size": "100",
 	}
 
 	if args == nil {
@@ -169,13 +165,26 @@ func (t *ProjectListTool) parseArguments(args interface{}) map[string]string {
 		return params
 	}
 
-	if page, exists := argsMap["page"]; exists {
-		if pageFloat, ok := page.(float64); ok {
-			pageIndex := int(pageFloat) - 1
-			if pageIndex < 0 {
-				pageIndex = 0
+	// 解析字符串参数
+	stringParams := []string{
+		"identifier", "type", "include_deleted", "include_archived",
+	}
+
+	for _, param := range stringParams {
+		if value, exists := argsMap[param]; exists {
+			if str, ok := value.(string); ok && str != "" {
+				params[param] = str
 			}
-			params["page_index"] = fmt.Sprintf("%d", pageIndex)
+		}
+	}
+
+	if pageIndex, exists := argsMap["page_index"]; exists {
+		if pageIndexFloat, ok := pageIndex.(float64); ok {
+			pageIndexInt := int(pageIndexFloat) - 1
+			if pageIndexInt < 0 {
+				pageIndexInt = 0
+			}
+			params["page_index"] = fmt.Sprintf("%d", pageIndexInt)
 		}
 	}
 
@@ -216,7 +225,7 @@ func (t *ProjectListTool) formatResponse(resp ProjectListResponse) string {
 		totalPages = 1
 	}
 
-	result.WriteString(fmt.Sprintf("项目列表 (第%d页，共%d页，总计%d个项目):\n\n", currentPage, totalPages, resp.Total))
+	result.WriteString(fmt.Sprintf("📋 项目列表 (第 %d 页，共 %d 页，总计 %d 个项目):\n\n", currentPage, totalPages, resp.Total))
 
 	if len(resp.Values) == 0 {
 		result.WriteString("暂无项目数据")
@@ -224,18 +233,18 @@ func (t *ProjectListTool) formatResponse(resp ProjectListResponse) string {
 	}
 
 	for i, project := range resp.Values {
-		result.WriteString(fmt.Sprintf("%d. %s (%s)\n", i+1, project.Name, project.Identifier))
-		result.WriteString(fmt.Sprintf("   项目ID: %s\n", project.ID))
-		result.WriteString(fmt.Sprintf("   类型: %s\n", project.Type))
-		result.WriteString(fmt.Sprintf("   状态: %s (%s)\n", project.State.Name, project.State.Type))
-		result.WriteString(fmt.Sprintf("   可见性: %s\n", project.Visibility))
+		result.WriteString(fmt.Sprintf("📂 %d. %s (项目标识：%s)\n", i+1, project.Name, project.Identifier))
+		result.WriteString(fmt.Sprintf("🆔 项目ID(project_id): %s\n", project.ID))
+		result.WriteString(fmt.Sprintf("📊 类型: %s\n", project.Type))
+		result.WriteString(fmt.Sprintf("📈 状态: %s\n", project.State))
+		result.WriteString(fmt.Sprintf("📦 可见性: %s\n", project.Visibility))
 
 		if project.Color != "" {
-			result.WriteString(fmt.Sprintf("   颜色: %s\n", project.Color))
+			result.WriteString(fmt.Sprintf("🌈 颜色: %s\n", project.Color))
 		}
 
 		if project.Description != "" {
-			result.WriteString(fmt.Sprintf("   描述: %s\n", project.Description))
+			result.WriteString(fmt.Sprintf("📝 描述: %s\n", project.Description))
 		}
 
 		// 显示成员信息
@@ -287,7 +296,7 @@ type CreateProjectRequest struct {
 	Visibility          string `json:"visibility,omitempty"`
 	Description         string `json:"description,omitempty"`
 	Color               string `json:"color,omitempty"`
-	IdentifierGenerated bool   `json:"-"` // 标记identifier是否自动生成，不发送到API
+	IdentifierGenerated bool   `json:"-"` // 标记 identifier 是否自动生成，不发送到 API
 }
 
 // generateProjectIdentifier 根据项目名称生成项目标识符
@@ -331,13 +340,13 @@ func generateProjectIdentifier(projectName string) string {
 	return identifier
 }
 
-// CreateProjectTool 创建项目工具结构体
+// 创建项目工具结构体
 type CreateProjectTool struct {
 	name        string
 	description string
 }
 
-// NewCreateProjectTool 创建项目工具实例
+// 创建项目工具实例
 func NewCreateProjectTool() MCPTool {
 	return &CreateProjectTool{
 		name:        "create_project",
@@ -345,40 +354,26 @@ func NewCreateProjectTool() MCPTool {
 	}
 }
 
-// GetName 返回工具名称
+// 返回工具名称
 func (t *CreateProjectTool) GetName() string {
 	return t.name
 }
 
-// GetDescription 返回工具描述
+// 返回工具描述
 func (t *CreateProjectTool) GetDescription() string {
 	return t.description
 }
 
-// GetToolDefinition 返回工具定义
+// 返回工具定义
 func (t *CreateProjectTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
-		mcp.WithDescription("创建新的PingCode项目 - 支持Scrum、Kanban、瀑布等项目类型，可设置项目名称、标识符、可见性等"),
-		mcp.WithString("name",
-			mcp.Description("项目名称 - 必填，项目的显示名称"),
-			mcp.Required(),
-		),
-		mcp.WithString("identifier",
-			mcp.Description("项目标识符 - 可选，项目的唯一标识，如果为空将根据项目名称自动生成"),
-		),
-		mcp.WithString("type",
-			mcp.Description("项目类型 - 必填，支持：scrum(敏捷)、kanban(看板)、waterfall(瀑布)"),
-			mcp.Required(),
-		),
-		mcp.WithString("visibility",
-			mcp.Description("项目可见性 - 可选，支持：public(公开)、private(私有)，默认private"),
-		),
-		mcp.WithString("description",
-			mcp.Description("项目描述 - 可选，项目的详细描述信息"),
-		),
-		mcp.WithString("color",
-			mcp.Description("项目颜色 - 可选，十六进制格式，如：#56ABFB"),
-		),
+		mcp.WithDescription("创建新的 PingCode 项目 - 支持 Scrum、Kanban、瀑布等项目类型，可设置项目名称、标识符、可见性等"),
+		mcp.WithString("name", mcp.Description("项目名称 - 必填，项目的显示名称"), mcp.Required()),
+		mcp.WithString("identifier", mcp.Description("项目的标识 - 可选，项目的唯一标识，如果为空将根据项目名称自动生成")),
+		mcp.WithString("type", mcp.Description("项目类型 - 必填，支持：scrum(敏捷)、kanban(看板)、waterfall(瀑布)"), mcp.Required()),
+		mcp.WithString("visibility", mcp.Description("项目可见性 - 可选，支持：public(公开)、private(私有)，默认private")),
+		mcp.WithString("description", mcp.Description("项目描述 - 可选，项目的详细描述信息")),
+		mcp.WithString("color", mcp.Description("项目颜色 - 可选，十六进制格式，如：#56ABFB")),
 	)
 }
 
@@ -462,18 +457,18 @@ func (t *CreateProjectTool) parseCreateProjectArguments(args interface{}) (*Crea
 		return nil, fmt.Errorf("name is required")
 	}
 
-	// identifier参数处理：如果为空或不存在，根据项目名称自动生成
+	// identifier 参数处理：如果为空或不存在，根据项目名称自动生成
 	if identifier, exists := argsMap["identifier"]; exists {
 		if identifierStr, ok := identifier.(string); ok && identifierStr != "" {
 			projectRequest.Identifier = identifierStr
 			projectRequest.IdentifierGenerated = false
 		} else {
-			// identifier存在但为空，自动生成
+			// identifier 存在但为空，自动生成
 			projectRequest.Identifier = generateProjectIdentifier(projectRequest.Name)
 			projectRequest.IdentifierGenerated = true
 		}
 	} else {
-		// identifier不存在，自动生成
+		// identifier 不存在，自动生成
 		projectRequest.Identifier = generateProjectIdentifier(projectRequest.Name)
 		projectRequest.IdentifierGenerated = true
 	}
@@ -588,7 +583,7 @@ func (t *CreateProjectTool) formatCreateProjectResponse(project Project, identif
 		result.WriteString(fmt.Sprintf("颜色: %s\n", project.Color))
 	}
 
-	result.WriteString(fmt.Sprintf("状态: %s (%s)\n", project.State.Name, project.State.Type))
+	result.WriteString(fmt.Sprintf("状态: %s\n", project.State))
 
 	// 显示创建信息
 	createdTime := time.Unix(project.CreatedAt, 0).Format("2006-01-02 15:04:05")
@@ -600,13 +595,13 @@ func (t *CreateProjectTool) formatCreateProjectResponse(project Project, identif
 	return result.String()
 }
 
-// AddProjectMemberRequest 添加项目成员请求结构体
+// 添加项目成员请求结构体
 type AddProjectMemberRequest struct {
 	UserID string `json:"user_id"`
 	Type   string `json:"type,omitempty"` // 成员类型，可选
 }
 
-// AddProjectMemberResponse 添加项目成员响应结构体
+// 添加项目成员响应结构体
 type AddProjectMemberResponse struct {
 	ID      string  `json:"id"`
 	URL     string  `json:"url"`
@@ -616,13 +611,13 @@ type AddProjectMemberResponse struct {
 	Role    Role    `json:"role"`
 }
 
-// AddProjectMemberTool 添加项目成员工具结构体
+// 添加项目成员工具结构体
 type AddProjectMemberTool struct {
 	name        string
 	description string
 }
 
-// NewAddProjectMemberTool 创建添加项目成员工具实例
+// 创建添加项目成员工具实例
 func NewAddProjectMemberTool() MCPTool {
 	return &AddProjectMemberTool{
 		name:        "add_project_member",
@@ -630,35 +625,27 @@ func NewAddProjectMemberTool() MCPTool {
 	}
 }
 
-// GetName 返回工具名称
+// 返回工具名称
 func (t *AddProjectMemberTool) GetName() string {
 	return t.name
 }
 
-// GetDescription 返回工具描述
+// 返回工具描述
 func (t *AddProjectMemberTool) GetDescription() string {
 	return t.description
 }
 
-// GetToolDefinition 返回工具定义
+// 返回工具定义
 func (t *AddProjectMemberTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
 		mcp.WithDescription("添加项目成员 - 将指定用户添加到项目中，可设置成员类型和角色"),
-		mcp.WithString("project_id",
-			mcp.Description("项目ID - 必填，要添加成员的项目唯一标识，可通过get_project_list工具获取"),
-			mcp.Required(),
-		),
-		mcp.WithString("user_id",
-			mcp.Description("用户ID - 必填，要添加的用户唯一标识，可通过企业用户列表工具获取"),
-			mcp.Required(),
-		),
-		mcp.WithString("type",
-			mcp.Description("成员类型 - 可选，指定成员在项目中的类型"),
-		),
+		mcp.WithString("project_id", mcp.Description("项目ID - 必填，要添加成员的项目唯一标识，可通过get_project_list工具获取"), mcp.Required()),
+		mcp.WithString("user_id", mcp.Description("用户ID - 必填，要添加的用户唯一标识，可通过企业用户列表工具获取"), mcp.Required()),
+		mcp.WithString("type", mcp.Description("成员类型 - 可选，指定成员在项目中的类型")),
 	)
 }
 
-// Handle 处理添加项目成员请求
+// 处理添加项目成员请求
 func (t *AddProjectMemberTool) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// 创建logger实例
 	log := logger.New()
@@ -808,7 +795,7 @@ func (t *AddProjectMemberTool) formatAddMemberResponse(resp AddProjectMemberResp
 	// 显示角色信息
 	result.WriteString(fmt.Sprintf("角色: %s (ID: %s)\n", resp.Role.Name, resp.Role.ID))
 
-	result.WriteString(fmt.Sprintf("用户信息:\n"))
+	result.WriteString("用户信息:\n")
 	result.WriteString(fmt.Sprintf("  - 用户ID: %s\n", resp.User.ID))
 	result.WriteString(fmt.Sprintf("  - 用户名: %s\n", resp.User.Name))
 	result.WriteString(fmt.Sprintf("  - 显示名称: %s\n", resp.User.DisplayName))
@@ -838,20 +825,20 @@ type RemoveProjectMemberResponse struct {
 	Project Project `json:"project"`
 }
 
-// Role 角色结构体
+// 角色结构体
 type Role struct {
 	ID   string `json:"id"`
 	URL  string `json:"url"`
 	Name string `json:"name"`
 }
 
-// RemoveProjectMemberTool 移除项目成员工具结构体
+// 移除项目成员工具结构体
 type RemoveProjectMemberTool struct {
 	name        string
 	description string
 }
 
-// NewRemoveProjectMemberTool 创建移除项目成员工具实例
+// 创建移除项目成员工具实例
 func NewRemoveProjectMemberTool() MCPTool {
 	return &RemoveProjectMemberTool{
 		name:        "remove_project_member",
@@ -859,32 +846,26 @@ func NewRemoveProjectMemberTool() MCPTool {
 	}
 }
 
-// GetName 返回工具名称
+// 返回工具名称
 func (t *RemoveProjectMemberTool) GetName() string {
 	return t.name
 }
 
-// GetDescription 返回工具描述
+// 返回工具描述
 func (t *RemoveProjectMemberTool) GetDescription() string {
 	return t.description
 }
 
-// GetToolDefinition 返回工具定义
+// 返回工具定义
 func (t *RemoveProjectMemberTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
 		mcp.WithDescription("移除项目成员 - 从指定项目中移除用户，取消其项目访问权限"),
-		mcp.WithString("project_id",
-			mcp.Description("项目ID - 必填，要移除成员的项目唯一标识，可通过get_project_list工具获取"),
-			mcp.Required(),
-		),
-		mcp.WithString("user_id",
-			mcp.Description("用户ID - 必填，要移除的用户唯一标识，可通过get_project_members工具获取"),
-			mcp.Required(),
-		),
+		mcp.WithString("project_id", mcp.Description("项目ID - 必填，要移除成员的项目唯一标识，可通过 get_project_list 工具获取"), mcp.Required()),
+		mcp.WithString("user_id", mcp.Description("用户ID - 必填，要移除的用户唯一标识，可通过 get_project_members 工具获取"), mcp.Required()),
 	)
 }
 
-// Handle 处理移除项目成员请求
+// 处理移除项目成员请求
 func (t *RemoveProjectMemberTool) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// 创建logger实例
 	log := logger.New()
@@ -940,7 +921,7 @@ func (t *RemoveProjectMemberTool) Handle(ctx context.Context, request mcp.CallTo
 	return mcp.NewToolResultText(result), nil
 }
 
-// parseRemoveMemberArguments 解析移除项目成员请求参数
+// 解析移除项目成员请求参数
 func (t *RemoveProjectMemberTool) parseRemoveMemberArguments(args interface{}) (string, *RemoveProjectMemberRequest, error) {
 	if args == nil {
 		return "", nil, fmt.Errorf("missing required arguments")
@@ -979,7 +960,7 @@ func (t *RemoveProjectMemberTool) parseRemoveMemberArguments(args interface{}) (
 	return projectID, memberRequest, nil
 }
 
-// doRemoveMemberRequest 执行移除项目成员API调用
+// 执行移除项目成员API调用
 func (t *RemoveProjectMemberTool) doRemoveMemberRequest(ctx context.Context, token string, projectID string, memberRequest *RemoveProjectMemberRequest, log *logger.Logger) (string, error) {
 	// 构建API URL - 使用 projectRemoveMemberAPIURL 并包含用户ID
 	apiURL := fmt.Sprintf(projectRemoveMemberAPIURL, projectID, memberRequest.UserID)
@@ -1008,14 +989,14 @@ func (t *RemoveProjectMemberTool) doRemoveMemberRequest(ctx context.Context, tok
 	return string(body), nil
 }
 
-// formatRemoveMemberResponse 格式化移除项目成员响应结果
+// 格式化移除项目成员响应结果
 func (t *RemoveProjectMemberTool) formatRemoveMemberResponse(resp RemoveProjectMemberResponse, projectID string) string {
 	var result strings.Builder
 
 	result.WriteString("项目成员移除成功:\n\n")
 	result.WriteString(fmt.Sprintf("项目ID: %s\n", projectID))
 	result.WriteString(fmt.Sprintf("项目名称: %s (%s)\n", resp.Project.Name, resp.Project.Identifier))
-	result.WriteString(fmt.Sprintf("移除的成员信息:\n"))
+	result.WriteString("移除的成员信息:\n")
 	result.WriteString(fmt.Sprintf("  - 成员ID: %s\n", resp.ID))
 	result.WriteString(fmt.Sprintf("  - 成员类型: %s\n", resp.Type))
 	result.WriteString(fmt.Sprintf("  - 用户ID: %s\n", resp.User.ID))
@@ -1033,7 +1014,7 @@ func (t *RemoveProjectMemberTool) formatRemoveMemberResponse(resp RemoveProjectM
 	return result.String()
 }
 
-// ProjectMembersResponse 获取项目成员列表响应结构体
+// 获取项目成员列表响应结构体
 type ProjectMembersResponse struct {
 	PageIndex int      `json:"page_index"`
 	PageSize  int      `json:"page_size"`
@@ -1041,13 +1022,13 @@ type ProjectMembersResponse struct {
 	Values    []Member `json:"values"`
 }
 
-// GetProjectMembersTool 获取项目成员列表工具结构体
+// 获取项目成员列表工具结构体
 type GetProjectMembersTool struct {
 	name        string
 	description string
 }
 
-// NewGetProjectMembersTool 创建获取项目成员列表工具实例
+// 创建获取项目成员列表工具实例
 func NewGetProjectMembersTool() MCPTool {
 	return &GetProjectMembersTool{
 		name:        "get_project_members",
@@ -1055,30 +1036,23 @@ func NewGetProjectMembersTool() MCPTool {
 	}
 }
 
-// GetName 返回工具名称
+// 返回工具名称
 func (t *GetProjectMembersTool) GetName() string {
 	return t.name
 }
 
-// GetDescription 返回工具描述
+// 返回工具描述
 func (t *GetProjectMembersTool) GetDescription() string {
 	return t.description
 }
 
-// GetToolDefinition 返回工具定义
+// 返回工具定义
 func (t *GetProjectMembersTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
 		mcp.WithDescription("获取项目成员列表 - 查看指定项目的所有成员信息，包括用户详情、角色、权限等"),
-		mcp.WithString("project_id",
-			mcp.Description("项目ID - 必填，要查询成员的项目唯一标识，可通过get_project_list工具获取"),
-			mcp.Required(),
-		),
-		mcp.WithNumber("page",
-			mcp.Description("页码 - 可选，从1开始，默认为1"),
-		),
-		mcp.WithNumber("page_size",
-			mcp.Description("每页数量 - 可选，默认20，最大100"),
-		),
+		mcp.WithString("project_id", mcp.Description("项目ID - 必填，要查询成员的项目唯一标识，可通过 get_project_list 工具获取"), mcp.Required()),
+		mcp.WithNumber("page_index", mcp.Description("页码 - 可选，从0开始，默认为为0时，表示第一页")),
+		mcp.WithNumber("page_size", mcp.Description("每页数量 - 可选，默认30，最大100")),
 	)
 }
 
@@ -1138,7 +1112,7 @@ func (t *GetProjectMembersTool) Handle(ctx context.Context, request mcp.CallTool
 	return mcp.NewToolResultText(result), nil
 }
 
-// parseGetMembersArguments 解析获取项目成员列表请求参数
+// 解析获取项目成员列表请求参数
 func (t *GetProjectMembersTool) parseGetMembersArguments(args interface{}) (string, map[string]string, error) {
 	if args == nil {
 		return "", nil, fmt.Errorf("missing required arguments")
@@ -1187,7 +1161,7 @@ func (t *GetProjectMembersTool) parseGetMembersArguments(args interface{}) (stri
 	return projectID, params, nil
 }
 
-// doGetMembersRequest 执行获取项目成员列表API调用
+// 执行获取项目成员列表API调用
 func (t *GetProjectMembersTool) doGetMembersRequest(ctx context.Context, token string, projectID string, params map[string]string, log *logger.Logger) (string, error) {
 	// 构建API URL
 	apiURL := fmt.Sprintf(projectMemberAPIURL, projectID)
@@ -1214,7 +1188,7 @@ func (t *GetProjectMembersTool) doGetMembersRequest(ctx context.Context, token s
 	return string(body), nil
 }
 
-// formatGetMembersResponse 格式化获取项目成员列表响应结果
+// 格式化获取项目成员列表响应结果
 func (t *GetProjectMembersTool) formatGetMembersResponse(resp ProjectMembersResponse, projectID string) string {
 	var result strings.Builder
 

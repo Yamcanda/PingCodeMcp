@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -25,15 +26,21 @@ func main() {
 	// 创建服务器
 	s := server.NewMCPServer()
 
-	// 启动 HTTP 服务器
-	httpServer := s.ServeHTTP()
+	// 获取配置好的 Mux
+	mux := s.ServeHTTP()
+
+	// 创建一个标准的 http.Server
+	httpServer := &http.Server{
+		Addr:    ":" + cfg.GetPort(),
+		Handler: mux,
+	}
 
 	log.Infof("Starting %s v%s", cfg.GetServerName(), cfg.GetServerVersion())
 	log.Infof("HTTP server listening on :%s", cfg.GetPort())
 
 	// 使用 goroutine 异步启动服务器
 	go func() {
-		if err := httpServer.Start(":" + cfg.GetPort()); err != nil {
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal("Server error:", err)
 		}
 	}()

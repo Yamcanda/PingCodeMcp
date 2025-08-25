@@ -10,7 +10,7 @@ BINARY_UNIX=$(BINARY_NAME)_unix
 
 # Build the application
 build:
-	$(GOBUILD) -o bin/$(BINARY_NAME) cmd/server/main.go
+	$(GOBUILD) -o bin/$(BINARY_NAME).exe cmd/server/main.go
 
 # Build for Linux
 build-linux:
@@ -30,6 +30,9 @@ test:
 test-coverage:
 	$(GOTEST) -v -coverprofile=coverage.out ./...
 	$(GOCMD) tool cover -html=coverage.out
+
+npx:
+	npx @modelcontextprotocol/inspector $(GOCMD) run cmd/server/main.go
 
 # Download dependencies
 deps:

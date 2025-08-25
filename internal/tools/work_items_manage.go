@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 const (
 	workItemsAPIURL      = baseUrl + "/v1/project/work_items"
 	workItemStatesAPIURL = baseUrl + "/v1/project/work_item/states"
+	workItemTypesAPIURL  = baseUrl + "/v1/project/work_item/types"
 	workItemTimeout      = 15 * time.Second
 )
 
@@ -30,11 +32,12 @@ func init() {
 			NewDeleteWorkItemTool(),
 			NewListWorkItemStatesTool(),
 			NewListWorkItemPrioritiesTool(),
+			NewListWorkItemTypesTool(),
 		}
 	})
 }
 
-// CreateWorkItemRequest 创建工作项的请求结构
+// 创建工作项的请求结构
 type CreateWorkItemRequest struct {
 	// 工作项负责人的id
 	AssigneeID *string `json:"assignee_id,omitempty"`
@@ -78,7 +81,7 @@ type CreateWorkItemRequest struct {
 	VersionID *string `json:"version_id,omitempty"`
 }
 
-// WorkItemProperties 工作项属性的键值对集合
+// 工作项属性的键值对集合
 type WorkItemProperties struct {
 	// 工作项属性prop_a
 	PropA *string `json:"prop_a,omitempty"`
@@ -86,7 +89,7 @@ type WorkItemProperties struct {
 	PropB *string `json:"prop_b,omitempty"`
 }
 
-// CreateWorkItemResponse 创建工作项的响应结构
+// 创建工作项的响应结构
 type CreateWorkItemResponse struct {
 	ID         string `json:"id"`
 	Identifier string `json:"identifier"`
@@ -142,23 +145,23 @@ type CreateWorkItemResponse struct {
 	Tags         []interface{} `json:"tags"`
 }
 
-// WorkItemPropertiesResponse 响应中的工作项属性
+// 响应中的工作项属性
 type WorkItemPropertiesResponse struct {
 	PropA string `json:"prop_a"`
 	PropB string `json:"prop_b"`
 }
 
-// CreateWorkItemTool 创建工作项工具
+// 创建工作项工具
 type CreateWorkItemTool struct {
 	name        string
 	description string
 }
 
-// NewCreateWorkItemTool 创建新的工作项创建工具实例
+// 创建新的工作项创建工具实例
 func NewCreateWorkItemTool() MCPTool {
 	return &CreateWorkItemTool{
 		name:        "create_work_item",
-		description: "Create a work item",
+		description: "创建新的工作项",
 	}
 }
 
@@ -173,10 +176,10 @@ func (t *CreateWorkItemTool) GetDescription() string {
 func (t *CreateWorkItemTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
 		mcp.WithDescription(t.description),
-		mcp.WithString("project_id", mcp.Description("项目ID - 必填，可通过get_project_list工具获取"), mcp.Required()),
+		mcp.WithString("project_id", mcp.Description("项目ID - 必填，可通过 get_project_list 工具获取"), mcp.Required()),
 		mcp.WithString("title", mcp.Description("工作项标题 - 必填，简洁明了地描述工作项内容"), mcp.Required()),
 		mcp.WithString("type_id", mcp.Description("工作项类型ID - 必填，如：epic(史诗)、feature(特性)、story(用户故事)、task(任务)、bug(缺陷)"), mcp.Required()),
-		mcp.WithString("assignee_id", mcp.Description("负责人ID - 可选，不填则默认为当前用户，可通过get_project_members工具获取项目成员ID")),
+		mcp.WithString("assignee_id", mcp.Description("负责人ID - 可选，不填则默认为当前用户，可通过 get_project_members 工具获取项目成员ID")),
 		mcp.WithString("board_id", mcp.Description("看板ID - 可选，仅在Kanban项目中使用")),
 		mcp.WithString("description", mcp.Description("工作项详细描述 - 可选，支持Markdown格式")),
 		mcp.WithNumber("end_at", mcp.Description("截止时间 - 可选，Unix时间戳格式，如：1735689600")),
@@ -184,16 +187,18 @@ func (t *CreateWorkItemTool) GetToolDefinition() mcp.Tool {
 		mcp.WithNumber("estimated_workload", mcp.Description("预估工时 - 可选，单位为小时，如：8.5")),
 		mcp.WithString("parent_id", mcp.Description("父工作项ID - 可选，用于创建子任务或建立层级关系")),
 		mcp.WithArray("participant_ids", mcp.Description("关注人ID列表 - 可选，数组格式，如：[\"user1\", \"user2\"]")),
-		mcp.WithString("priority_id", mcp.Description("优先级ID - 可选，设置工作项优先级，可通过list_work_item_priorities工具获取可用优先级ID")),
+		mcp.WithString("priority_id", mcp.Description("优先级ID - 可选，设置工作项优先级，可通过 list_work_item_priorities 工具获取可用优先级ID")),
 		mcp.WithNumber("remaining_workload", mcp.Description("剩余工时 - 可选，单位为小时")),
-		mcp.WithString("sprint_id", mcp.Description("迭代ID - 可选，仅在Scrum项目中使用")),
-		mcp.WithNumber("start_at", mcp.Description("开始时间 - 可选，Unix时间戳格式，不填则默认为当前时间")),
-		mcp.WithString("state_id", mcp.Description("状态ID - 可选，可通过list_work_item_states工具获取可用状态")),
+		mcp.WithString("sprint_id", mcp.Description("迭代ID - 可选，仅在 Scrum 项目中使用，可通过 get_sprint_list 工具获取")),
+		mcp.WithNumber("start_at", mcp.Description("开始时间 - 可选，Unix 时间戳格式，不填则默认为当前时间")),
+		mcp.WithString("state_id", mcp.Description("状态ID - 可选，可通过 list_work_item_states 工具获取可用状态")),
 		mcp.WithNumber("story_points", mcp.Description("故事点 - 可选，用于敏捷开发中的工作量估算")),
-		mcp.WithString("swimlane_id", mcp.Description("泳道ID - 可选，仅在Kanban项目中使用")),
+		mcp.WithString("swimlane_id", mcp.Description("泳道ID - 可选，仅在 Kanban 项目中使用")),
 		mcp.WithString("version_id", mcp.Description("版本ID - 可选，关联到特定的发布版本")),
 		mcp.WithString("prop_a", mcp.Description("自定义属性A - 可选，项目特定的自定义字段")),
 		mcp.WithString("prop_b", mcp.Description("自定义属性B - 可选，项目特定的自定义字段")),
+		mcp.WithNumber("page_index", mcp.Description("页码 - 可选，从0开始，默认为为0时，表示第一页")),
+		mcp.WithNumber("page_size", mcp.Description("每页数量 - 可选，默认30，最大100")),
 	)
 }
 
@@ -270,6 +275,11 @@ func (t *CreateWorkItemTool) parseCreateWorkItemArguments(args interface{}) (*Cr
 	projectID, ok := argsMap["project_id"].(string)
 	if !ok || projectID == "" {
 		return nil, fmt.Errorf("project_id 是必需的参数")
+	}
+
+	match, _ := regexp.MatchString("^[a-z0-9]+$", projectID)
+	if !match {
+		return nil, fmt.Errorf("invalid project_id: must be a combination of lowercase letters and numbers")
 	}
 
 	title, ok := argsMap["title"].(string)
@@ -507,7 +517,7 @@ func (t *CreateWorkItemTool) getCurrentUserID(ctx context.Context, token string,
 	return userInfo.ID, nil
 }
 
-// UpdateWorkItemRequest 更新工作项的请求结构
+// 更新工作项的请求结构
 type UpdateWorkItemRequest struct {
 	// 项目的id
 	ProjectID *string `json:"project_id,omitempty"`
@@ -551,7 +561,7 @@ type UpdateWorkItemRequest struct {
 	Properties *WorkItemProperties `json:"properties,omitempty"`
 }
 
-// UpdateWorkItemResponse 更新工作项的响应结构
+// 更新工作项的响应结构
 type UpdateWorkItemResponse struct {
 	ID         string `json:"id"`
 	URL        string `json:"url"`
@@ -631,7 +641,7 @@ type UpdateWorkItemResponse struct {
 		Name string `json:"name"`
 	} `json:"priority"`
 
-	StoryPoints  int64       `json:"story_points"`
+	StoryPoints  float64     `json:"story_points"`
 	Description  string      `json:"description"`
 	CompletedAt  int64       `json:"completed_at"`
 	Properties   interface{} `json:"properties"`
@@ -666,17 +676,17 @@ type UpdateWorkItemResponse struct {
 	} `json:"updated_by"`
 }
 
-// UpdateWorkItemTool 更新工作项工具
+// 更新工作项工具
 type UpdateWorkItemTool struct {
 	name        string
 	description string
 }
 
-// NewUpdateWorkItemTool 创建新的工作项更新工具实例
+// 创建新的工作项更新工具实例
 func NewUpdateWorkItemTool() MCPTool {
 	return &UpdateWorkItemTool{
 		name:        "update_work_item",
-		description: "Update a work item",
+		description: "更新工作项",
 	}
 }
 
@@ -691,21 +701,21 @@ func (t *UpdateWorkItemTool) GetDescription() string {
 func (t *UpdateWorkItemTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
 		mcp.WithDescription(t.description),
-		mcp.WithString("work_item_id", mcp.Description("工作项ID - 必填，要更新的工作项唯一标识，可通过list_work_items工具获取"), mcp.Required()),
-		mcp.WithString("project_id", mcp.Description("项目ID - 可选，更改工作项所属项目")),
+		mcp.WithString("work_item_id", mcp.Description("工作项ID - 必填，要更新的工作项唯一标识，可通过 list_work_items 工具获取"), mcp.Required()),
+		mcp.WithString("project_id", mcp.Description("项目ID - 可选，更改工作项所属项目，可通过 get_project_list 工具获取")),
 		mcp.WithString("title", mcp.Description("工作项标题 - 可选，更新工作项的标题")),
-		mcp.WithString("type_id", mcp.Description("工作项类型ID - 可选，更改工作项类型，如：epic、feature、story、task、bug")),
-		mcp.WithString("description", mcp.Description("工作项描述 - 可选，更新详细描述，支持Markdown格式")),
-		mcp.WithNumber("start_at", mcp.Description("开始时间 - 可选，Unix时间戳格式")),
-		mcp.WithNumber("end_at", mcp.Description("截止时间 - 可选，Unix时间戳格式")),
-		mcp.WithString("state_id", mcp.Description("状态ID - 可选，更改工作项状态，可通过list_work_item_states工具获取")),
+		mcp.WithString("type_id", mcp.Description("工作项类型ID - 可选，更改工作项类型，如：epic(史诗)、feature(特性)、story(用户故事)、task(任务)、bug(缺陷)")),
+		mcp.WithString("description", mcp.Description("工作项描述 - 可选，更新详细描述，支持 Markdown 格式")),
+		mcp.WithNumber("start_at", mcp.Description("开始时间 - 可选，Unix 时间戳格式")),
+		mcp.WithNumber("end_at", mcp.Description("截止时间 - 可选，Unix 时间戳格式")),
+		mcp.WithString("state_id", mcp.Description("状态ID - 可选，更改工作项状态，可通过 list_work_item_states 工具获取")),
 		mcp.WithString("parent_id", mcp.Description("父工作项ID - 可选，设置或更改父子关系")),
-		mcp.WithString("sprint_id", mcp.Description("迭代ID - 可选，分配到指定迭代（Scrum项目）")),
+		mcp.WithString("sprint_id", mcp.Description("迭代ID - 可选，分配到指定迭代（Scrum 项目），可通过 get_sprint_list 工具获取")),
 		mcp.WithString("version_id", mcp.Description("版本ID - 可选，关联到特定发布版本")),
 		mcp.WithString("board_id", mcp.Description("看板ID - 可选，移动到指定看板（Kanban项目）")),
 		mcp.WithString("entry_id", mcp.Description("看板栏ID - 可选，移动到指定看板栏（Kanban项目）")),
 		mcp.WithString("swimlane_id", mcp.Description("泳道ID - 可选，移动到指定泳道（Kanban项目）")),
-		mcp.WithString("priority_id", mcp.Description("优先级ID - 可选，设置工作项优先级，可通过list_work_item_priorities工具获取可用优先级ID")),
+		mcp.WithString("priority_id", mcp.Description("优先级ID - 可选，设置工作项优先级，可通过 list_work_item_priorities 工具获取可用优先级ID")),
 		mcp.WithString("assignee_id", mcp.Description("负责人ID - 可选，重新分配负责人")),
 		mcp.WithArray("participant_ids", mcp.Description("关注人ID列表 - 可选，更新关注人列表，数组格式")),
 		mcp.WithNumber("story_points", mcp.Description("故事点 - 可选，更新敏捷估算点数")),
@@ -777,8 +787,12 @@ func (t *UpdateWorkItemTool) parseUpdateWorkItemArguments(args interface{}) (str
 
 	// 解析可选参数
 	if projectID, exists := argsMap["project_id"]; exists {
-		if str, ok := projectID.(string); ok && str != "" {
-			req.ProjectID = &str
+		if pidStr, ok := projectID.(string); ok && pidStr != "" {
+			match, _ := regexp.MatchString("^[a-z0-9]+$", pidStr)
+			if !match {
+				return "", nil, fmt.Errorf("invalid project_id: must be a combination of lowercase letters and numbers")
+			}
+			req.ProjectID = &pidStr
 		}
 	}
 
@@ -989,7 +1003,7 @@ func (t *UpdateWorkItemTool) formatUpdateWorkItemResponse(resp UpdateWorkItemRes
 	}
 
 	if resp.StoryPoints > 0 {
-		result.WriteString(fmt.Sprintf("📈 故事点: %d\n", resp.StoryPoints))
+		result.WriteString(fmt.Sprintf("📈 故事点: %.0f\n", resp.StoryPoints))
 	}
 
 	if resp.StartAt > 0 {
@@ -1037,7 +1051,7 @@ func (t *UpdateWorkItemTool) formatUpdateWorkItemResponse(resp UpdateWorkItemRes
 	return result.String()
 }
 
-// ListWorkItemsResponse 获取工作项列表的响应结构
+// 获取工作项列表的响应结构
 type ListWorkItemsResponse struct {
 	PageSize  int                `json:"page_size"`
 	PageIndex int                `json:"page_index"`
@@ -1045,23 +1059,23 @@ type ListWorkItemsResponse struct {
 	Values    []WorkItemListItem `json:"values"`
 }
 
-// WorkItemListItem 工作项列表项
+// 工作项列表项
 type WorkItemListItem struct {
-	ID          string `json:"id"`
-	URL         string `json:"url"`
-	Identifier  string `json:"identifier"`
-	Title       string `json:"title"`
-	Type        string `json:"type"`
-	StartAt     int64  `json:"start_at"`
-	EndAt       int64  `json:"end_at"`
-	ParentID    string `json:"parent_id"`
-	Description string `json:"description"`
-	CompletedAt int64  `json:"completed_at"`
-	StoryPoints int64  `json:"story_points"`
-	CreatedAt   int64  `json:"created_at"`
-	UpdatedAt   int64  `json:"updated_at"`
-	IsArchived  int    `json:"is_archived"`
-	IsDeleted   int    `json:"is_deleted"`
+	ID          string  `json:"id"`
+	URL         string  `json:"url"`
+	Identifier  string  `json:"identifier"`
+	Title       string  `json:"title"`
+	Type        string  `json:"type"`
+	StartAt     int64   `json:"start_at"`
+	EndAt       int64   `json:"end_at"`
+	ParentID    string  `json:"parent_id"`
+	Description string  `json:"description"`
+	CompletedAt int64   `json:"completed_at"`
+	StoryPoints float64 `json:"story_points"`
+	CreatedAt   int64   `json:"created_at"`
+	UpdatedAt   int64   `json:"updated_at"`
+	IsArchived  int     `json:"is_archived"`
+	IsDeleted   int     `json:"is_deleted"`
 
 	Project struct {
 		ID         string `json:"id"`
@@ -1173,17 +1187,17 @@ type WorkItemListItem struct {
 	} `json:"updated_by"`
 }
 
-// ListWorkItemsTool 获取工作项列表工具
+// 获取工作项列表工具
 type ListWorkItemsTool struct {
 	name        string
 	description string
 }
 
-// NewListWorkItemsTool 创建新的工作项列表获取工具实例
+// 创建新的工作项列表获取工具实例
 func NewListWorkItemsTool() MCPTool {
 	return &ListWorkItemsTool{
 		name:        "list_work_items",
-		description: "Get work items list",
+		description: "获取工作项列表 - 查看系统中所有工作项信息，或查看某些项目下某些迭代中的所有工作项信息",
 	}
 }
 
@@ -1198,21 +1212,21 @@ func (t *ListWorkItemsTool) GetDescription() string {
 func (t *ListWorkItemsTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
 		mcp.WithDescription(t.description),
-		mcp.WithString("identifier", mcp.Description("工作项编号 - 可选，精确匹配特定工作项编号")),
-		mcp.WithString("project_ids", mcp.Description("项目ID列表 - 可选，用逗号分隔，最多20个，如：'proj1,proj2'")),
-		mcp.WithString("type_ids", mcp.Description("工作项类型ID列表 - 可选，用逗号分隔，最多20个，如：'epic,story,task'")),
+		mcp.WithString("identifier", mcp.Description("工作项的标识 - 可选，精确匹配特定工作项标识")),
+		mcp.WithString("project_ids", mcp.Description("项目ID列表 - 可选，用逗号分隔，最多20个，如：'proj1,proj2'，可通过 get_project_list 工具获取")),
+		mcp.WithString("type_ids", mcp.Description("工作项类型ID列表 - 可选，用逗号分隔，最多20个，如：'epic(史诗),feature(特性),story(用户故事),task(任务),bug(缺陷)'，可通过 list_work_item_types 工具获取")),
 		mcp.WithString("parent_ids", mcp.Description("父工作项ID列表 - 可选，用逗号分隔，最多20个，查询指定父工作项的子项")),
 		mcp.WithString("assignee_ids", mcp.Description("负责人ID列表 - 可选，用逗号分隔，最多20个，查询指定负责人的工作项")),
 		mcp.WithString("state_ids", mcp.Description("状态ID列表 - 可选，用逗号分隔，最多20个，如：'open,in_progress,done'")),
 		mcp.WithString("start_between", mcp.Description("开始时间范围 - 可选，用逗号分隔起止时间戳，如：'1735689600,1735776000'")),
 		mcp.WithString("end_between", mcp.Description("结束时间范围 - 可选，用逗号分隔起止时间戳，如：'1735689600,1735776000'")),
-		mcp.WithString("priority_ids", mcp.Description("优先级ID列表 - 可选，用逗号分隔，最多20个，可通过list_work_item_priorities工具获取可用优先级ID")),
+		mcp.WithString("priority_ids", mcp.Description("优先级ID列表 - 可选，用逗号分隔，最多20个，可通过 list_work_item_priorities 工具获取可用优先级ID")),
 		mcp.WithString("bug_type_ids", mcp.Description("缺陷类别ID列表 - 可选，用逗号分隔，最多20个，仅适用于bug类型工作项")),
-		mcp.WithString("sprint_ids", mcp.Description("迭代ID列表 - 可选，用逗号分隔，最多20个，查询指定迭代的工作项")),
-		mcp.WithString("board_ids", mcp.Description("看板ID列表 - 可选，用逗号分隔，最多20个，仅适用于Kanban项目")),
-		mcp.WithString("entry_ids", mcp.Description("看板栏ID列表 - 可选，用逗号分隔，最多20个，仅适用于Kanban项目")),
+		mcp.WithString("sprint_ids", mcp.Description("迭代ID列表 - 可选，用逗号分隔，最多20个，查询指定迭代的工作项，可通过 get_sprint_list 工具获取")),
+		mcp.WithString("board_ids", mcp.Description("看板ID列表 - 可选，用逗号分隔，最多20个，仅适用于 Kanban 项目")),
+		mcp.WithString("entry_ids", mcp.Description("看板栏ID列表 - 可选，用逗号分隔，最多20个，仅适用于 Kanban 项目")),
 		mcp.WithString("tag_ids", mcp.Description("标签ID列表 - 可选，用逗号分隔，最多20个，查询带有指定标签的工作项")),
-		mcp.WithString("swimlane_ids", mcp.Description("泳道ID列表 - 可选，用逗号分隔，最多20个，仅适用于Kanban项目")),
+		mcp.WithString("swimlane_ids", mcp.Description("泳道ID列表 - 可选，用逗号分隔，最多20个，仅适用于 Kanban 项目")),
 		mcp.WithString("phase_ids", mcp.Description("计划阶段ID列表 - 可选，用逗号分隔，最多20个，查询指定阶段的工作项")),
 		mcp.WithString("version_ids", mcp.Description("版本ID列表 - 可选，用逗号分隔，最多20个，查询指定版本的工作项")),
 		mcp.WithString("created_by_ids", mcp.Description("创建人ID列表 - 可选，用逗号分隔，最多20个，查询指定创建人的工作项")),
@@ -1222,8 +1236,8 @@ func (t *ListWorkItemsTool) GetToolDefinition() mcp.Tool {
 		mcp.WithString("keywords", mcp.Description("关键字搜索 - 可选，支持工作项编号和标题的模糊搜索")),
 		mcp.WithString("include_deleted", mcp.Description("包含已删除项 - 可选，true/false，默认false")),
 		mcp.WithString("include_archived", mcp.Description("包含已归档项 - 可选，true/false，默认false")),
+		mcp.WithNumber("page_index", mcp.Description("页码 - 可选，从0开始，默认为为0时，表示第一页")),
 		mcp.WithNumber("page_size", mcp.Description("每页数量 - 可选，默认30，最大100")),
-		mcp.WithNumber("page_index", mcp.Description("页码 - 可选，从0开始，默认0")),
 	)
 }
 
@@ -1243,7 +1257,10 @@ func (t *ListWorkItemsTool) Handle(ctx context.Context, request mcp.CallToolRequ
 		token = "Bearer " + token
 	}
 
-	queryParams := t.parseListWorkItemsArguments(request.GetArguments())
+	queryParams, err := t.parseListWorkItemsArguments(request.GetArguments())
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
 
 	respStr, err := t.doListWorkItemsRequest(ctx, token, queryParams, requestLogger)
 	if err != nil {
@@ -1265,16 +1282,18 @@ func (t *ListWorkItemsTool) Handle(ctx context.Context, request mcp.CallToolRequ
 	return mcp.NewToolResultText(result), nil
 }
 
-func (t *ListWorkItemsTool) parseListWorkItemsArguments(args interface{}) map[string]string {
-	queryParams := make(map[string]string)
+func (t *ListWorkItemsTool) parseListWorkItemsArguments(args interface{}) (map[string]string, error) {
+	params := map[string]string{
+		"page_size": "100", // 默认值
+	}
 
 	if args == nil {
-		return queryParams
+		return params, nil
 	}
 
 	argsMap, ok := args.(map[string]interface{})
 	if !ok {
-		return queryParams
+		return params, nil
 	}
 
 	// 解析字符串参数
@@ -1289,25 +1308,50 @@ func (t *ListWorkItemsTool) parseListWorkItemsArguments(args interface{}) map[st
 	for _, param := range stringParams {
 		if value, exists := argsMap[param]; exists {
 			if str, ok := value.(string); ok && str != "" {
-				queryParams[param] = str
+				params[param] = str
+			}
+		}
+	}
+
+	// 验证 project_ids
+	if projectIDs, exists := argsMap["project_ids"]; exists {
+		if projectIDsStr, ok := projectIDs.(string); ok && projectIDsStr != "" {
+			match, _ := regexp.MatchString("^[a-z0-9]+(,[a-z0-9]+)*$", projectIDsStr)
+			if !match {
+				return nil, fmt.Errorf("invalid format for 'project_ids'. It must be a comma-separated string, where each ID consists of only lowercase letters and numbers")
+			}
+		}
+	}
+
+	if sprintIDs, exists := argsMap["sprint_ids"]; exists {
+		if sprintIDsStr, ok := sprintIDs.(string); ok && sprintIDsStr != "" {
+			match, _ := regexp.MatchString("^[a-z0-9]+(,[a-z0-9]+)*$", sprintIDsStr)
+			if !match {
+				return nil, fmt.Errorf("invalid format for 'sprint_ids'. It must be a comma-separated string, where each ID consists of only lowercase letters and numbers")
 			}
 		}
 	}
 
 	// 解析数字参数
 	if pageSize, exists := argsMap["page_size"]; exists {
-		if num, ok := pageSize.(float64); ok {
-			queryParams["page_size"] = fmt.Sprintf("%.0f", num)
+		if pageSizeFloat, ok := pageSize.(float64); ok {
+			pageSizeInt := int(pageSizeFloat)
+			if pageSizeInt > 0 {
+				params["page_size"] = fmt.Sprintf("%d", pageSizeInt)
+			}
 		}
 	}
 
 	if pageIndex, exists := argsMap["page_index"]; exists {
-		if num, ok := pageIndex.(float64); ok {
-			queryParams["page_index"] = fmt.Sprintf("%.0f", num)
+		if pageIndexFloat, ok := pageIndex.(float64); ok {
+			pageIndexInt := int(pageIndexFloat)
+			if pageIndexInt > 0 {
+				params["page_index"] = fmt.Sprintf("%d", pageIndexInt)
+			}
 		}
 	}
 
-	return queryParams
+	return params, nil
 }
 
 func (t *ListWorkItemsTool) doListWorkItemsRequest(ctx context.Context, token string, queryParams map[string]string, log *logger.Logger) (string, error) {
@@ -1327,7 +1371,7 @@ func (t *ListWorkItemsTool) doListWorkItemsRequest(ctx context.Context, token st
 
 	var errorRes models.ErrorResponse
 	if err := json.Unmarshal(body, &errorRes); err == nil && errorRes.Code != "" {
-		log.Error("获取工作项列表请求失败", "error", err)
+		log.Error("获取工作项列表请求失败", err)
 		return "", fmt.Errorf("获取工作项列表请求失败: %s", errorRes.Message)
 	}
 
@@ -1337,9 +1381,19 @@ func (t *ListWorkItemsTool) doListWorkItemsRequest(ctx context.Context, token st
 
 func (t *ListWorkItemsTool) formatListWorkItemsResponse(resp ListWorkItemsResponse) string {
 	var result strings.Builder
+
+	// 计算当前页码（从1开始显示）和总页数
+	currentPage := resp.PageIndex + 1
+	totalPages := (resp.Total + resp.PageSize - 1) / resp.PageSize
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
+	// result.WriteString(fmt.Sprintf("工作项列表 (第 %d 页，共 %d 页，总计 %d 个工作项):\n\n", currentPage, totalPages, resp.Total))
+
 	result.WriteString("📋 工作项列表\n\n")
 	result.WriteString(fmt.Sprintf("📊 总计: %d 个工作项\n", resp.Total))
-	result.WriteString(fmt.Sprintf("📄 当前页: %d，每页: %d 个\n\n", resp.PageIndex+1, resp.PageSize))
+	result.WriteString(fmt.Sprintf("📄 当前页: %d，每页: %d 个，共 %d 页\n\n", currentPage, resp.PageSize, totalPages))
 
 	if len(resp.Values) == 0 {
 		result.WriteString("暂无工作项数据\n")
@@ -1348,11 +1402,12 @@ func (t *ListWorkItemsTool) formatListWorkItemsResponse(resp ListWorkItemsRespon
 
 	for i, item := range resp.Values {
 		result.WriteString(fmt.Sprintf("--- 工作项 %d ---\n", i+1))
-		result.WriteString(fmt.Sprintf("🆔 ID: %s\n", item.ID))
-		result.WriteString(fmt.Sprintf("🏷️ 标识符: %s\n", item.Identifier))
+		result.WriteString(fmt.Sprintf("🆔 工作项ID: %s\n", item.ID))
+		result.WriteString(fmt.Sprintf("🏷️ 工作项标识: %s\n", item.Identifier))
 		result.WriteString(fmt.Sprintf("📋 标题: %s\n", item.Title))
-		result.WriteString(fmt.Sprintf("📂 项目: %s (%s)\n", item.Project.Name, item.Project.Identifier))
-		result.WriteString(fmt.Sprintf("📊 类型: %s\n", item.Type))
+		result.WriteString(fmt.Sprintf("📂 项目: %s (项目ID[project_id]：%s 项目标识：%s)\n", item.Project.Name, item.Project.ID, item.Project.Identifier))
+		result.WriteString(fmt.Sprintf("📂 迭代: %s (迭代ID[sprint_id]：%s 迭代名称：%s)\n", item.Sprint.ID, item.Sprint.ID, item.Sprint.Name))
+		result.WriteString(fmt.Sprintf("📊 工作项类型ID: %s\n", item.Type))
 
 		if item.Assignee != nil {
 			result.WriteString(fmt.Sprintf("👤 负责人: %s (%s)\n", item.Assignee.DisplayName, item.Assignee.Name))
@@ -1383,7 +1438,7 @@ func (t *ListWorkItemsTool) formatListWorkItemsResponse(resp ListWorkItemsRespon
 		}
 
 		if item.StoryPoints > 0 {
-			result.WriteString(fmt.Sprintf("📈 故事点: %d\n", item.StoryPoints))
+			result.WriteString(fmt.Sprintf("📈 故事点: %0.f\n", item.StoryPoints))
 		}
 
 		if item.StartAt > 0 {
@@ -1571,7 +1626,7 @@ func (t *DeleteWorkItemTool) GetDescription() string {
 func (t *DeleteWorkItemTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
 		mcp.WithDescription(t.description),
-		mcp.WithString("work_item_id", mcp.Description("工作项ID - 必填，要删除的工作项唯一标识，可通过list_work_items工具获取"), mcp.Required()),
+		mcp.WithString("work_item_id", mcp.Description("工作项ID - 必填，要删除的工作项唯一标识，可通过 list_work_items 工具获取"), mcp.Required()),
 	)
 }
 
@@ -1665,7 +1720,7 @@ func (t *DeleteWorkItemTool) formatDeleteWorkItemResponse(resp DeleteWorkItemRes
 	result.WriteString(fmt.Sprintf("🏷️ 标识符: %s\n", resp.Identifier))
 	result.WriteString(fmt.Sprintf("📂 项目: %s (%s)\n", resp.Project.Name, resp.Project.Identifier))
 	result.WriteString(fmt.Sprintf("🔗 项目ID: %s\n", resp.Project.ID))
-	result.WriteString(fmt.Sprintf("📊 类型: %s\n", resp.Type))
+	result.WriteString(fmt.Sprintf("📊 工作项类型ID: %s\n", resp.Type))
 
 	if resp.Description != "" {
 		// 限制描述长度显示
@@ -1758,7 +1813,7 @@ func (t *DeleteWorkItemTool) formatDeleteWorkItemResponse(resp DeleteWorkItemRes
 	return result.String()
 }
 
-// WorkItemState 工作项状态结构
+// 工作项状态结构
 type WorkItemState struct {
 	ID       string `json:"id"`
 	URL      string `json:"url"`
@@ -1768,7 +1823,7 @@ type WorkItemState struct {
 	IsSystem bool   `json:"is_system"`
 }
 
-// ListWorkItemStatesResponse 获取工作项状态列表的响应结构
+// 获取工作项状态列表的响应结构
 type ListWorkItemStatesResponse struct {
 	PageSize  int             `json:"page_size"`
 	PageIndex int             `json:"page_index"`
@@ -1776,17 +1831,17 @@ type ListWorkItemStatesResponse struct {
 	Values    []WorkItemState `json:"values"`
 }
 
-// ListWorkItemStatesTool 获取工作项状态列表工具
+// 获取工作项状态列表工具
 type ListWorkItemStatesTool struct {
 	name        string
 	description string
 }
 
-// NewListWorkItemStatesTool 创建新的工作项状态列表获取工具实例
+// 创建新的工作项状态列表获取工具实例
 func NewListWorkItemStatesTool() MCPTool {
 	return &ListWorkItemStatesTool{
 		name:        "list_work_item_states",
-		description: "Get work item states list",
+		description: "获取工作项状态列表",
 	}
 }
 
@@ -1801,8 +1856,8 @@ func (t *ListWorkItemStatesTool) GetDescription() string {
 func (t *ListWorkItemStatesTool) GetToolDefinition() mcp.Tool {
 	return mcp.NewTool(t.name,
 		mcp.WithDescription(t.description),
-		mcp.WithString("project_id", mcp.Description("项目ID - 可选，指定项目的唯一标识，可通过get_project_list工具获取")),
-		mcp.WithString("work_item_type_id", mcp.Description("工作项类型ID - 可选，瀑布项目使用具体类型ID，敏捷项目使用：epic、feature、story、task、bug、issue")),
+		mcp.WithString("project_id", mcp.Description("项目ID - 可选，指定项目的唯一标识，可通过 get_project_list 工具获取")),
+		mcp.WithString("work_item_type_id", mcp.Description("工作项类型ID - 可选，瀑布项目使用具体类型ID，敏捷项目使用：epic(史诗)、feature(特性)、story(用户故事)、task(任务)、bug(缺陷)、issue")),
 	)
 }
 
@@ -1822,7 +1877,11 @@ func (t *ListWorkItemStatesTool) Handle(ctx context.Context, request mcp.CallToo
 		token = "Bearer " + token
 	}
 
-	queryParams := t.parseListWorkItemStatesArguments(request.GetArguments())
+	queryParams, err := t.parseListWorkItemStatesArguments(request.GetArguments())
+
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
 
 	respStr, err := t.doListWorkItemStatesRequest(ctx, token, queryParams, requestLogger)
 	if err != nil {
@@ -1844,22 +1903,26 @@ func (t *ListWorkItemStatesTool) Handle(ctx context.Context, request mcp.CallToo
 	return mcp.NewToolResultText(result), nil
 }
 
-func (t *ListWorkItemStatesTool) parseListWorkItemStatesArguments(args interface{}) map[string]string {
+func (t *ListWorkItemStatesTool) parseListWorkItemStatesArguments(args interface{}) (map[string]string, error) {
 	queryParams := make(map[string]string)
 
 	if args == nil {
-		return queryParams
+		return queryParams, nil
 	}
 
 	argsMap, ok := args.(map[string]interface{})
 	if !ok {
-		return queryParams
+		return queryParams, nil
 	}
 
 	// 解析项目ID参数
 	if projectID, exists := argsMap["project_id"]; exists {
-		if str, ok := projectID.(string); ok && str != "" {
-			queryParams["project_id"] = str
+		if pidStr, ok := projectID.(string); ok && pidStr != "" {
+			match, _ := regexp.MatchString("^[a-z0-9]+$", pidStr)
+			if !match {
+				return nil, fmt.Errorf("invalid project_id: must be a combination of lowercase letters and numbers")
+			}
+			queryParams["project_id"] = pidStr
 		}
 	}
 
@@ -1870,7 +1933,7 @@ func (t *ListWorkItemStatesTool) parseListWorkItemStatesArguments(args interface
 		}
 	}
 
-	return queryParams
+	return queryParams, nil
 }
 
 func (t *ListWorkItemStatesTool) doListWorkItemStatesRequest(ctx context.Context, token string, queryParams map[string]string, log *logger.Logger) (string, error) {
@@ -1923,14 +1986,14 @@ func (t *ListWorkItemStatesTool) formatListWorkItemStatesResponse(resp ListWorkI
 	return result.String()
 }
 
-// WorkItemPriority 工作项优先级结构
+// 工作项优先级结构
 type WorkItemPriority struct {
 	ID   string `json:"id"`
 	URL  string `json:"url"`
 	Name string `json:"name"`
 }
 
-// ListWorkItemPrioritiesResponse 获取工作项优先级列表的响应结构
+// 获取工作项优先级列表的响应结构
 type ListWorkItemPrioritiesResponse struct {
 	PageSize  int                `json:"page_size"`
 	PageIndex int                `json:"page_index"`
@@ -1938,13 +2001,13 @@ type ListWorkItemPrioritiesResponse struct {
 	Values    []WorkItemPriority `json:"values"`
 }
 
-// ListWorkItemPrioritiesTool 获取工作项优先级列表工具
+// 获取工作项优先级列表工具
 type ListWorkItemPrioritiesTool struct {
 	name        string
 	description string
 }
 
-// NewListWorkItemPrioritiesTool 创建新的工作项优先级列表获取工具实例
+// 创建新的工作项优先级列表获取工具实例
 func NewListWorkItemPrioritiesTool() MCPTool {
 	return &ListWorkItemPrioritiesTool{
 		name:        "list_work_item_priorities",
@@ -2040,6 +2103,160 @@ func (t *ListWorkItemPrioritiesTool) formatListWorkItemPrioritiesResponse(resp L
 		result.WriteString(fmt.Sprintf("🆔 ID: %s\n", priority.ID))
 		result.WriteString(fmt.Sprintf("📋 名称: %s\n", priority.Name))
 		result.WriteString(fmt.Sprintf("🔗 链接: %s\n", priority.URL))
+		result.WriteString("\n")
+	}
+
+	return result.String()
+}
+
+// 工作项类型结构
+type WorkItemTypes struct {
+	ID    string `json:"id"`
+	URL   string `json:"url"`
+	Name  string `json:"name"`
+	Group string `json:"group"`
+}
+
+// 获取工作项类型列表的响应结构
+type ListWorkItemTypesResponse struct {
+	PageSize  int             `json:"page_size"`
+	PageIndex int             `json:"page_index"`
+	Total     int             `json:"total"`
+	Values    []WorkItemTypes `json:"values"`
+}
+
+// 获取工作项类型列表工具
+type ListWorkItemTypesTool struct {
+	name        string
+	description string
+}
+
+// 获取工作项类型列表工具实例
+func NewListWorkItemTypesTool() MCPTool {
+	return &ListWorkItemTypesTool{
+		name:        "list_work_item_types",
+		description: "获取工作项类型列表 - 查看系统中所有可用的工作项类型，用于创建或更新工作项时设置工作项类型",
+	}
+}
+
+func (t *ListWorkItemTypesTool) GetName() string {
+	return t.name
+}
+
+func (t *ListWorkItemTypesTool) GetDescription() string {
+	return t.description
+}
+
+func (t *ListWorkItemTypesTool) GetToolDefinition() mcp.Tool {
+	return mcp.NewTool(t.name, mcp.WithDescription(t.description),
+		mcp.WithString("project_id", mcp.Description("项目ID - 可选，指定项目的唯一标识，可通过 get_project_list 工具获取"), mcp.Required()),
+	)
+}
+
+func (t *ListWorkItemTypesTool) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	log := logger.New()
+	defer log.Sync()
+
+	requestLogger := log.With("tool", "list_work_item_types")
+	requestLogger.Info("开始获取工作项类型列表")
+
+	token, err := auth.TokenFromContext(ctx)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	if !strings.HasPrefix(token, "Bearer ") {
+		token = "Bearer " + token
+	}
+
+	queryParams, err := t.parseListWorkItemTypesArguments(request.GetArguments())
+
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	respStr, err := t.doListWorkItemTypesRequest(ctx, token, queryParams, requestLogger)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	var errorRes models.ErrorResponse
+	if err := json.Unmarshal([]byte(respStr), &errorRes); err == nil && errorRes.Code != "" {
+		requestLogger.With("success", false, "error", errorRes.Message).Error("获取工作项类型列表API调用失败")
+		return mcp.NewToolResultError(errorRes.Message), nil
+	}
+
+	var resp ListWorkItemTypesResponse
+	if err := json.Unmarshal([]byte(respStr), &resp); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("解析响应失败: %v", err)), nil
+	}
+
+	result := t.formatListWorkItemTypesResponse(resp)
+	return mcp.NewToolResultText(result), nil
+}
+
+func (t *ListWorkItemTypesTool) parseListWorkItemTypesArguments(args interface{}) (map[string]string, error) {
+	queryParams := make(map[string]string)
+
+	if args == nil {
+		return queryParams, nil
+	}
+
+	argsMap, ok := args.(map[string]interface{})
+	if !ok {
+		return queryParams, nil
+	}
+
+	// 解析项目ID参数
+	if projectID, exists := argsMap["project_id"]; exists {
+		if pidStr, ok := projectID.(string); ok && pidStr != "" {
+			match, _ := regexp.MatchString("^[a-z0-9]+$", pidStr)
+			if !match {
+				return nil, fmt.Errorf("invalid project_id: must be a combination of lowercase letters and numbers")
+			}
+			queryParams["project_id"] = pidStr
+		}
+	}
+
+	return queryParams, nil
+}
+
+func (t *ListWorkItemTypesTool) doListWorkItemTypesRequest(ctx context.Context, token string, queryParams map[string]string, log *logger.Logger) (string, error) {
+	headers := map[string]string{
+		"Authorization": token,
+		"Accept":        "application/json",
+		"Content-Type":  "application/json",
+	}
+
+	timeoutCtx, cancel := context.WithTimeout(ctx, workItemTimeout)
+	defer cancel()
+
+	body, _, err := utils.DoGet(timeoutCtx, workItemTypesAPIURL, headers, queryParams)
+	if err != nil {
+		return "", fmt.Errorf("获取工作项类型列表请求失败: %v", err)
+	}
+
+	log.With("url", workItemTypesAPIURL, "response_size_bytes", len(body), "success", true).Debug("获取工作项类型列表API请求成功")
+	return string(body), nil
+}
+
+func (t *ListWorkItemTypesTool) formatListWorkItemTypesResponse(resp ListWorkItemTypesResponse) string {
+	var result strings.Builder
+	result.WriteString("📊 工作项类型列表\n\n")
+	result.WriteString(fmt.Sprintf("📈 总计: %d 个工作项类型\n", resp.Total))
+	result.WriteString(fmt.Sprintf("📄 当前页: %d，每页: %d 个\n\n", resp.PageIndex+1, resp.PageSize))
+
+	if len(resp.Values) == 0 {
+		result.WriteString("暂无工作项类型数据\n")
+		return result.String()
+	}
+
+	for i, priority := range resp.Values {
+		result.WriteString(fmt.Sprintf("--- 工作项类型 %d ---\n", i+1))
+		result.WriteString(fmt.Sprintf("🆔 工作项类型ID: %s\n", priority.ID))
+		result.WriteString(fmt.Sprintf("📋 名称: %s\n", priority.Name))
+		result.WriteString(fmt.Sprintf("🔗 链接: %s\n", priority.URL))
+		result.WriteString(fmt.Sprintf("🔗 分组: %s\n", priority.Group))
 		result.WriteString("\n")
 	}
 
