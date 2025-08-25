@@ -16,7 +16,6 @@ import (
 )
 
 const (
-	sprintAPIURL  = baseUrl + "/v1/project/projects/%s/sprints" // {project_id}
 	sprintTimeout = 15 * time.Second
 )
 
@@ -212,7 +211,7 @@ func (t *SprintListTool) doRequest(ctx context.Context, token string, projectID 
 	timeoutCtx, cancel := context.WithTimeout(ctx, sprintTimeout)
 	defer cancel()
 
-	apiURL := fmt.Sprintf(sprintAPIURL, projectID)
+	apiURL := fmt.Sprintf("%s/v1/project/projects/%s/sprints", GetBaseUrl(), projectID)
 
 	body, _, err := utils.DoGet(timeoutCtx, apiURL, headers, params)
 	if err != nil {
@@ -432,7 +431,7 @@ func (t *CreateSprintTool) doRequest(ctx context.Context, token string, projectI
 		return "", fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
-	apiURL := fmt.Sprintf(sprintAPIURL, projectID)
+	apiURL := fmt.Sprintf("%s/v1/project/projects/%s/sprints", GetBaseUrl(), projectID)
 
 	body, _, err := utils.DoPostJSON(timeoutCtx, apiURL, headers, reqBody)
 	if err != nil {

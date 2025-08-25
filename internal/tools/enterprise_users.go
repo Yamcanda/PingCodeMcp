@@ -17,8 +17,6 @@ import (
 )
 
 const (
-	// 企业成员服务API地址
-	enterpriseUsersAPIURL = baseUrl + "/v1/directory/users"
 	// API请求超时时间
 	enterpriseUsersTimeout = 15 * time.Second
 )
@@ -241,19 +239,20 @@ func (t *EnterpriseUsersTool) doEnterpriseUsersRequest(ctx context.Context, toke
 		"Content-Type":  "application/json",
 	}
 
-	log.With("url", enterpriseUsersAPIURL, "method", "GET", "params", params).Debug("发起企业成员列表API请求")
+	apiURL := GetBaseUrl() + "/v1/directory/users"
+	log.With("url", apiURL, "method", "GET", "params", params).Debug("发起企业成员列表API请求")
 
 	// 创建带超时的上下文
 	timeoutCtx, cancel := context.WithTimeout(ctx, enterpriseUsersTimeout)
 	defer cancel()
 
-	body, _, err := utils.DoGet(timeoutCtx, enterpriseUsersAPIURL, headers, params)
+	body, _, err := utils.DoGet(timeoutCtx, apiURL, headers, params)
 	if err != nil {
-		log.With("url", enterpriseUsersAPIURL, "success", false, "error", err.Error()).Error("HTTP请求失败")
+		log.With("url", apiURL, "success", false, "error", err.Error()).Error("HTTP请求失败")
 		return "", err
 	}
 
-	log.With("url", enterpriseUsersAPIURL, "response_size_bytes", len(body), "success", true).Debug("企业成员列表API请求成功")
+	log.With("url", apiURL, "response_size_bytes", len(body), "success", true).Debug("企业成员列表API请求成功")
 
 	return string(body), nil
 }
@@ -524,7 +523,8 @@ func (t *CreateEnterpriseUserTool) doCreateUserRequest(ctx context.Context, toke
 		"Content-Type":  "application/json",
 	}
 
-	log.With("url", enterpriseUsersAPIURL, "method", "POST", "user_name", userRequest.Name).Debug("发起创建企业成员API请求")
+	apiURL := GetBaseUrl() + "/v1/directory/users"
+	log.With("url", apiURL, "method", "POST", "user_name", userRequest.Name).Debug("发起创建企业成员API请求")
 
 	// 创建带超时的上下文
 	timeoutCtx, cancel := context.WithTimeout(ctx, enterpriseUsersTimeout)
@@ -537,13 +537,13 @@ func (t *CreateEnterpriseUserTool) doCreateUserRequest(ctx context.Context, toke
 		return "", fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
-	body, _, err := utils.DoPostJSON(timeoutCtx, enterpriseUsersAPIURL, headers, requestBody)
+	body, _, err := utils.DoPostJSON(timeoutCtx, apiURL, headers, requestBody)
 	if err != nil {
-		log.With("url", enterpriseUsersAPIURL, "success", false, "error", err.Error()).Error("HTTP请求失败")
+		log.With("url", apiURL, "success", false, "error", err.Error()).Error("HTTP请求失败")
 		return "", err
 	}
 
-	log.With("url", enterpriseUsersAPIURL, "response_size_bytes", len(body), "success", true).Debug("创建企业成员API请求成功")
+	log.With("url", apiURL, "response_size_bytes", len(body), "success", true).Debug("创建企业成员API请求成功")
 
 	return string(body), nil
 }

@@ -18,10 +18,7 @@ import (
 )
 
 const (
-	projectAPIURL             = baseUrl + "/v1/project/projects"
-	projectMemberAPIURL       = baseUrl + "/v1/project/projects/%s/members"
-	projectRemoveMemberAPIURL = projectMemberAPIURL + "/%s"
-	projectTimeout            = 15 * time.Second
+	projectTimeout = 15 * time.Second
 )
 
 func init() {
@@ -206,11 +203,12 @@ func (t *ProjectListTool) doRequest(ctx context.Context, token string, params ma
 	timeoutCtx, cancel := context.WithTimeout(ctx, projectTimeout)
 	defer cancel()
 
-	body, _, err := utils.DoGet(timeoutCtx, projectAPIURL, headers, params)
+	apiURL := GetBaseUrl() + "/v1/project/projects"
+	body, _, err := utils.DoGet(timeoutCtx, apiURL, headers, params)
 	if err != nil {
 		return "", err
 	}
-	log.With("url", projectAPIURL, "response_size_bytes", len(body), "success", true).Debug("项目列表API请求成功")
+	log.With("url", apiURL, "response_size_bytes", len(body), "success", true).Debug("项目列表API请求成功")
 
 	return string(body), nil
 }
@@ -235,8 +233,8 @@ func (t *ProjectListTool) formatResponse(resp ProjectListResponse) string {
 	for i, project := range resp.Values {
 		result.WriteString(fmt.Sprintf("📂 %d. %s (项目标识：%s)\n", i+1, project.Name, project.Identifier))
 		result.WriteString(fmt.Sprintf("🆔 项目ID(project_id): %s\n", project.ID))
-		result.WriteString(fmt.Sprintf("📊 类型: %s\n", project.Type))
-		result.WriteString(fmt.Sprintf("📈 状态: %s\n", project.State))
+		result.WriteString(fmt.Sprintf("�� 类型: %s\n", project.Type))
+		result.WriteString(fmt.Sprintf("�� 状态: %s\n", project.State))
 		result.WriteString(fmt.Sprintf("📦 可见性: %s\n", project.Visibility))
 
 		if project.Color != "" {
@@ -533,8 +531,8 @@ func (t *CreateProjectTool) doCreateProjectRequest(ctx context.Context, token st
 		"Accept":        "application/json",
 		"Content-Type":  "application/json",
 	}
-
-	log.With("url", projectAPIURL, "method", "POST", "project_name", projectRequest.Name).Debug("发起创建项目API请求")
+	apiURL := GetBaseUrl() + "/v1/project/projects"
+	log.With("url", apiURL, "method", "POST", "project_name", projectRequest.Name).Debug("发起创建项目API请求")
 
 	// 创建带超时的上下文
 	timeoutCtx, cancel := context.WithTimeout(ctx, projectTimeout)
@@ -547,13 +545,13 @@ func (t *CreateProjectTool) doCreateProjectRequest(ctx context.Context, token st
 		return "", fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
-	body, _, err := utils.DoPostJSON(timeoutCtx, projectAPIURL, headers, requestBody)
+	body, _, err := utils.DoPostJSON(timeoutCtx, apiURL, headers, requestBody)
 	if err != nil {
-		log.With("url", projectAPIURL, "success", false, "error", err.Error()).Error("HTTP请求失败")
+		log.With("url", apiURL, "success", false, "error", err.Error()).Error("HTTP请求失败")
 		return "", err
 	}
 
-	log.With("url", projectAPIURL, "response_size_bytes", len(body), "success", true).Debug("创建项目API请求成功")
+	log.With("url", apiURL, "response_size_bytes", len(body), "success", true).Debug("创建项目API请求成功")
 
 	return string(body), nil
 }
@@ -750,7 +748,7 @@ func (t *AddProjectMemberTool) parseAddMemberArguments(args interface{}) (string
 // doAddMemberRequest 执行添加项目成员API调用
 func (t *AddProjectMemberTool) doAddMemberRequest(ctx context.Context, token string, projectID string, memberRequest *AddProjectMemberRequest, log *logger.Logger) (string, error) {
 	// 构建API URL
-	apiURL := fmt.Sprintf(projectMemberAPIURL, projectID)
+	apiURL := fmt.Sprintf(GetBaseUrl()+"/v1/project/projects/%s/members", projectID)
 
 	headers := map[string]string{
 		"Authorization": token,
@@ -963,7 +961,7 @@ func (t *RemoveProjectMemberTool) parseRemoveMemberArguments(args interface{}) (
 // 执行移除项目成员API调用
 func (t *RemoveProjectMemberTool) doRemoveMemberRequest(ctx context.Context, token string, projectID string, memberRequest *RemoveProjectMemberRequest, log *logger.Logger) (string, error) {
 	// 构建API URL - 使用 projectRemoveMemberAPIURL 并包含用户ID
-	apiURL := fmt.Sprintf(projectRemoveMemberAPIURL, projectID, memberRequest.UserID)
+	apiURL := fmt.Sprintf(GetBaseUrl()+"/v1/project/projects/%s/members/%s", projectID, memberRequest.UserID)
 
 	headers := map[string]string{
 		"Authorization": token,
@@ -1164,7 +1162,7 @@ func (t *GetProjectMembersTool) parseGetMembersArguments(args interface{}) (stri
 // 执行获取项目成员列表API调用
 func (t *GetProjectMembersTool) doGetMembersRequest(ctx context.Context, token string, projectID string, params map[string]string, log *logger.Logger) (string, error) {
 	// 构建API URL
-	apiURL := fmt.Sprintf(projectMemberAPIURL, projectID)
+	apiURL := fmt.Sprintf(GetBaseUrl()+"/v1/project/projects/%s/members", projectID)
 
 	headers := map[string]string{
 		"Authorization": token,

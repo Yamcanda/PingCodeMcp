@@ -9,6 +9,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+var (
+	appConfig *Config
+)
+
 // Config 应用程序配置结构体
 type Config struct {
 	Version     string            `yaml:"version"`
@@ -19,10 +23,11 @@ type Config struct {
 
 // ServerConfig 服务器配置
 type ServerConfig struct {
-	Name    string `yaml:"name"`
-	Version string `yaml:"version"`
-	Port    int    `yaml:"port"`
-	Host    string `yaml:"host"`
+	Name            string `yaml:"name"`
+	Version         string `yaml:"version"`
+	Port            int    `yaml:"port"`
+	Host            string `yaml:"host"`
+	PingCodeBaseUrl string `yaml:"pingcode_base_url"`
 }
 
 // LoggingConfig 日志配置
@@ -58,7 +63,8 @@ type EnvOverrideConfig struct {
 
 // Load 加载配置文件
 func Load() *Config {
-	return LoadFromFile("config.yaml")
+	appConfig = LoadFromFile("config.yaml")
+	return appConfig
 }
 
 // LoadFromFile 从指定文件加载配置
@@ -74,7 +80,7 @@ func LoadFromFile(filename string) *Config {
 	if config.EnvOverride.Enabled {
 		applyEnvOverrides(config)
 	}
-
+	appConfig = config
 	return config
 }
 
@@ -234,4 +240,12 @@ type LogConfig struct {
 	MaxBackups int
 	Compress   bool
 	Daily      bool
+}
+
+// GetPingCodeBaseUrl 获取 PingCode 的基础 URL
+func GetPingCodeBaseUrl() string {
+	if appConfig == nil {
+		return ""
+	}
+	return appConfig.Server.PingCodeBaseUrl
 }

@@ -16,9 +16,7 @@ import (
 )
 
 const (
-	workloadsAPIURL     = baseUrl + "/v1/workloads"
-	workloadTypesAPIURL = baseUrl + "/v1/workload_types"
-	workloadTimeout     = 15 * time.Second
+	workloadTimeout = 15 * time.Second
 )
 
 func init() {
@@ -292,7 +290,8 @@ func (t *CreateWorkloadTool) doCreateWorkloadRequest(ctx context.Context, token 
 	}
 
 	// 发送HTTP请求
-	body, _, err := utils.DoPostJSON(timeoutCtx, workloadsAPIURL, headers, requestBody)
+	apiURL := GetBaseUrl() + "/v1/workloads"
+	body, _, err := utils.DoPostJSON(timeoutCtx, apiURL, headers, requestBody)
 	if err != nil {
 		return "", fmt.Errorf("HTTP请求失败: %w", err)
 	}
@@ -430,7 +429,8 @@ func (t *GetWorkloadTypesTool) doGetWorkloadTypesRequest(ctx context.Context, to
 	}
 
 	// 发送HTTP请求
-	body, _, err := utils.DoGet(timeoutCtx, workloadTypesAPIURL, headers, nil)
+	apiURL := GetBaseUrl() + "/v1/workload_types"
+	body, _, err := utils.DoGet(timeoutCtx, apiURL, headers, nil)
 	if err != nil {
 		return "", fmt.Errorf("HTTP请求失败: %w", err)
 	}
@@ -572,7 +572,7 @@ func (t *DeleteWorkloadTool) doDeleteWorkloadRequest(ctx context.Context, token 
 	}
 
 	// 构建删除工时的URL
-	deleteURL := fmt.Sprintf("%s/%s", workloadsAPIURL, workloadID)
+	deleteURL := fmt.Sprintf("%s/v1/workloads/%s", GetBaseUrl(), workloadID)
 
 	// 发送HTTP DELETE请求
 	_, resp, err := utils.DoDelete(timeoutCtx, deleteURL, headers, nil)
@@ -790,7 +790,8 @@ func (t *ListWorkloadsTool) doListWorkloadsRequest(ctx context.Context, token st
 	}
 
 	// 发送HTTP请求
-	body, _, err := utils.DoGet(timeoutCtx, workloadsAPIURL, headers, queryParams)
+	apiURL := GetBaseUrl() + "/v1/workloads"
+	body, _, err := utils.DoGet(timeoutCtx, apiURL, headers, queryParams)
 	if err != nil {
 		return "", fmt.Errorf("HTTP请求失败: %w", err)
 	}
@@ -1033,7 +1034,7 @@ func (t *UpdateWorkloadTool) doUpdateWorkloadRequest(ctx context.Context, token 
 	}
 
 	// 构建更新工时的URL
-	updateURL := fmt.Sprintf("%s/%s", workloadsAPIURL, workloadID)
+	updateURL := fmt.Sprintf("%s/v1/workloads/%s", GetBaseUrl(), workloadID)
 
 	// 发送HTTP PATCH请求
 	body, _, err := utils.DoPatch(timeoutCtx, updateURL, headers, requestBody)

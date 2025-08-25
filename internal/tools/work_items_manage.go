@@ -17,10 +17,7 @@ import (
 )
 
 const (
-	workItemsAPIURL      = baseUrl + "/v1/project/work_items"
-	workItemStatesAPIURL = baseUrl + "/v1/project/work_item/states"
-	workItemTypesAPIURL  = baseUrl + "/v1/project/work_item/types"
-	workItemTimeout      = 15 * time.Second
+	workItemTimeout = 15 * time.Second
 )
 
 func init() {
@@ -443,12 +440,13 @@ func (t *CreateWorkItemTool) doCreateWorkItemRequest(ctx context.Context, token 
 		return "", fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
-	body, _, err := utils.DoPostJSON(timeoutCtx, workItemsAPIURL, headers, requestBody)
+	apiURL := GetBaseUrl() + "/v1/project/work_items"
+	body, _, err := utils.DoPostJSON(timeoutCtx, apiURL, headers, requestBody)
 	if err != nil {
 		return "", fmt.Errorf("创建工作项请求失败: %v", err)
 	}
 
-	log.With("url", workItemsAPIURL, "response_size_bytes", len(body), "success", true).Debug("创建工作项API请求成功")
+	log.With("url", apiURL, "response_size_bytes", len(body), "success", true).Debug("创建工作项API请求成功")
 	return string(body), nil
 }
 
@@ -501,6 +499,7 @@ func (t *CreateWorkItemTool) getCurrentUserID(ctx context.Context, token string,
 	defer cancel()
 
 	// 使用正确的用户信息API地址
+	userInfoAPIURL := GetBaseUrl() + "/v1/myself"
 	body, _, err := utils.DoGet(timeoutCtx, userInfoAPIURL, headers, nil)
 	if err != nil {
 		log.With("error", err.Error()).Error("获取用户信息API请求失败")
@@ -946,7 +945,7 @@ func (t *UpdateWorkItemTool) doUpdateWorkItemRequest(ctx context.Context, token 
 	defer cancel()
 
 	// 构建API URL
-	updateURL := fmt.Sprintf("%s/%s", workItemsAPIURL, workItemID)
+	updateURL := fmt.Sprintf("%s/v1/project/work_items/%s", GetBaseUrl(), workItemID)
 
 	// 序列化请求体
 	requestBody, err := json.Marshal(updateRequest)
@@ -1364,7 +1363,8 @@ func (t *ListWorkItemsTool) doListWorkItemsRequest(ctx context.Context, token st
 	timeoutCtx, cancel := context.WithTimeout(ctx, workItemTimeout)
 	defer cancel()
 
-	body, _, err := utils.DoGet(timeoutCtx, workItemsAPIURL, headers, queryParams)
+	apiURL := GetBaseUrl() + "/v1/project/work_items"
+	body, _, err := utils.DoGet(timeoutCtx, apiURL, headers, queryParams)
 	if err != nil {
 		return "", fmt.Errorf("获取工作项列表请求失败: %v", err)
 	}
@@ -1375,7 +1375,7 @@ func (t *ListWorkItemsTool) doListWorkItemsRequest(ctx context.Context, token st
 		return "", fmt.Errorf("获取工作项列表请求失败: %s", errorRes.Message)
 	}
 
-	log.With("url", workItemsAPIURL, "response_size_bytes", len(body), "success", true).Debug("获取工作项列表API请求成功")
+	log.With("url", apiURL, "response_size_bytes", len(body), "success", true).Debug("获取工作项列表API请求成功")
 	return string(body), nil
 }
 
@@ -1701,7 +1701,7 @@ func (t *DeleteWorkItemTool) doDeleteWorkItemRequest(ctx context.Context, token 
 	defer cancel()
 
 	// 构建API URL
-	deleteURL := fmt.Sprintf("%s/%s", workItemsAPIURL, workItemID)
+	deleteURL := fmt.Sprintf("%s/v1/project/work_items/%s", GetBaseUrl(), workItemID)
 
 	body, _, err := utils.DoDelete(timeoutCtx, deleteURL, headers, nil)
 	if err != nil {
@@ -1946,12 +1946,13 @@ func (t *ListWorkItemStatesTool) doListWorkItemStatesRequest(ctx context.Context
 	timeoutCtx, cancel := context.WithTimeout(ctx, workItemTimeout)
 	defer cancel()
 
-	body, _, err := utils.DoGet(timeoutCtx, workItemStatesAPIURL, headers, queryParams)
+	apiURL := GetBaseUrl() + "/v1/project/work_item/states"
+	body, _, err := utils.DoGet(timeoutCtx, apiURL, headers, queryParams)
 	if err != nil {
 		return "", fmt.Errorf("获取工作项状态列表请求失败: %v", err)
 	}
 
-	log.With("url", workItemStatesAPIURL, "response_size_bytes", len(body), "success", true).Debug("获取工作项状态列表API请求成功")
+	log.With("url", apiURL, "response_size_bytes", len(body), "success", true).Debug("获取工作项状态列表API请求成功")
 	return string(body), nil
 }
 
@@ -2076,7 +2077,7 @@ func (t *ListWorkItemPrioritiesTool) doListWorkItemPrioritiesRequest(ctx context
 	defer cancel()
 
 	// 构建API URL
-	prioritiesAPIURL := baseUrl + "/v1/project/priorities"
+	prioritiesAPIURL := GetBaseUrl() + "/v1/project/priorities"
 
 	body, _, err := utils.DoGet(timeoutCtx, prioritiesAPIURL, headers, nil)
 	if err != nil {
@@ -2231,12 +2232,13 @@ func (t *ListWorkItemTypesTool) doListWorkItemTypesRequest(ctx context.Context, 
 	timeoutCtx, cancel := context.WithTimeout(ctx, workItemTimeout)
 	defer cancel()
 
-	body, _, err := utils.DoGet(timeoutCtx, workItemTypesAPIURL, headers, queryParams)
+	apiURL := GetBaseUrl() + "/v1/project/work_item/types"
+	body, _, err := utils.DoGet(timeoutCtx, apiURL, headers, queryParams)
 	if err != nil {
 		return "", fmt.Errorf("获取工作项类型列表请求失败: %v", err)
 	}
 
-	log.With("url", workItemTypesAPIURL, "response_size_bytes", len(body), "success", true).Debug("获取工作项类型列表API请求成功")
+	log.With("url", apiURL, "response_size_bytes", len(body), "success", true).Debug("获取工作项类型列表API请求成功")
 	return string(body), nil
 }
 

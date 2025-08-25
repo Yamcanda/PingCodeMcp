@@ -16,8 +16,6 @@ import (
 )
 
 const (
-	// 用户信息服务API地址
-	userInfoAPIURL = baseUrl + "/v1/myself"
 	// API请求超时时间
 	userInfoTimeout = 15 * time.Second
 )
@@ -131,19 +129,20 @@ func (t *UserInfoTool) doUserInfoRequest(ctx context.Context, token string, log 
 		"Content-Type":  "application/json",
 	}
 
-	log.With("url", userInfoAPIURL, "method", "GET").Debug("发起用户信息API请求")
+	apiURL := GetBaseUrl() + "/v1/myself"
+	log.With("url", apiURL, "method", "GET").Debug("发起用户信息API请求")
 
 	// 创建带超时的上下文
 	timeoutCtx, cancel := context.WithTimeout(ctx, userInfoTimeout)
 	defer cancel()
 
-	body, _, err := utils.DoGet(timeoutCtx, userInfoAPIURL, headers, nil)
+	body, _, err := utils.DoGet(timeoutCtx, apiURL, headers, nil)
 	if err != nil {
-		log.With("url", userInfoAPIURL, "success", false, "error", err.Error()).Error("HTTP请求失败")
+		log.With("url", apiURL, "success", false, "error", err.Error()).Error("HTTP请求失败")
 		return "", err
 	}
 
-	log.With("url", userInfoAPIURL, "response_size_bytes", len(body), "success", true).Debug("用户信息API请求成功")
+	log.With("url", apiURL, "response_size_bytes", len(body), "success", true).Debug("用户信息API请求成功")
 
 	return string(body), nil
 }

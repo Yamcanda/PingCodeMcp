@@ -8,6 +8,7 @@ server:
   version: "1.0.0"
   port: 8080
   host: "0.0.0.0"
+  pingcode_base_url: "https://open.pingcode.com"
 
 # 日志配置
 logging:

@@ -3,17 +3,15 @@ package tools
 import (
 	"context"
 
+	"PingCodeMcp/internal/config"
+
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
-const (
-	// baseUrl = "https://open.pingcode.com"
-	baseUrl = "http://192.168.0.170/open"
-)
-
 var (
 	toolsFns []func() *[]MCPTool
+	baseUrl  string
 )
 
 // 定义 MCP 工具接口
@@ -50,4 +48,12 @@ func RegisterAllTools(mcpServer *server.MCPServer) {
 			}
 		}
 	}
+}
+
+// GetBaseUrl 获取基础URL
+func GetBaseUrl() string {
+	if baseUrl == "" {
+		baseUrl = config.GetPingCodeBaseUrl()
+	}
+	return baseUrl
 }
