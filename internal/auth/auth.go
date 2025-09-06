@@ -4,6 +4,12 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+
+	"PingCodeMcp/internal/config"
+)
+
+var (
+	authToken string
 )
 
 // authKey is a custom context key for storing the auth token.
@@ -16,6 +22,10 @@ func WithAuthKey(ctx context.Context, auth string) context.Context {
 
 // AuthFromRequest extracts the auth token from the request headers.
 func AuthFromRequest(ctx context.Context, r *http.Request) context.Context {
+	authToken = getAuthToken()
+	if authToken != "" {
+		return WithAuthKey(ctx, authToken)
+	}
 	return WithAuthKey(ctx, r.Header.Get("Authorization"))
 }
 
@@ -28,4 +38,12 @@ func TokenFromContext(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("missing auth")
 	}
 	return auth, nil
+}
+
+// 获取授权 Token 信息
+func getAuthToken() string {
+	if authToken == "" {
+		authToken = config.GetPingCodeAuthToken()
+	}
+	return authToken
 }

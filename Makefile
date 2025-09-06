@@ -17,10 +17,17 @@ build-linux:
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) -o bin/$(BINARY_UNIX) cmd/server/main.go
 
 # Clean build artifacts
+ifeq ($(OS),Windows_NT)
 clean:
 	$(GOCLEAN)
-	rm -f bin/$(BINARY_NAME)
-	rm -f bin/$(BINARY_UNIX)
+	-cmd /c del bin\$(BINARY_NAME).exe
+	-cmd /c del bin\$(BINARY_UNIX)
+else
+clean:
+	$(GOCLEAN)
+	-rm -f bin/$(BINARY_NAME).exe
+	-rm -f bin/$(BINARY_UNIX)
+endif
 
 # Run tests
 test:

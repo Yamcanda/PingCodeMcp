@@ -49,27 +49,34 @@ type Member struct {
 	Role *Role  `json:"role,omitempty"` // 角色信息，可选
 }
 
+type ProjectState struct {
+	ID   string `json:"id"`
+	URL  string `json:"url"`
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
 type Project struct {
-	ID          string   `json:"id"`
-	URL         string   `json:"url"`
-	Visibility  string   `json:"visibility"`
-	Name        string   `json:"name"`
-	Type        string   `json:"type"`
-	Identifier  string   `json:"identifier"`
-	Color       string   `json:"color"`
-	Description string   `json:"description"`
-	Members     []Member `json:"members"`
-	State       string   `json:"state"`
-	Assignee    *User    `json:"assignee"`
-	ScopeType   string   `json:"scope_type"`
-	StartAt     *int64   `json:"start_at"`
-	EndAt       *int64   `json:"end_at"`
-	CreatedAt   int64    `json:"created_at"`
-	CreatedBy   User     `json:"created_by"`
-	UpdatedAt   int64    `json:"updated_at"`
-	UpdatedBy   User     `json:"updated_by"`
-	IsArchived  int      `json:"is_archived"`
-	IsDeleted   int      `json:"is_deleted"`
+	ID          string       `json:"id"`
+	URL         string       `json:"url"`
+	Visibility  string       `json:"visibility"`
+	Name        string       `json:"name"`
+	Type        string       `json:"type"`
+	Identifier  string       `json:"identifier"`
+	Color       string       `json:"color"`
+	Description string       `json:"description"`
+	Members     []Member     `json:"members"`
+	State       ProjectState `json:"state"`
+	Assignee    *User        `json:"assignee"`
+	ScopeType   string       `json:"scope_type"`
+	StartAt     *int64       `json:"start_at"`
+	EndAt       *int64       `json:"end_at"`
+	CreatedAt   int64        `json:"created_at"`
+	CreatedBy   User         `json:"created_by"`
+	UpdatedAt   int64        `json:"updated_at"`
+	UpdatedBy   User         `json:"updated_by"`
+	IsArchived  int          `json:"is_archived"`
+	IsDeleted   int          `json:"is_deleted"`
 }
 
 type ProjectListResponse struct {
@@ -233,8 +240,8 @@ func (t *ProjectListTool) formatResponse(resp ProjectListResponse) string {
 	for i, project := range resp.Values {
 		result.WriteString(fmt.Sprintf("📂 %d. %s (项目标识：%s)\n", i+1, project.Name, project.Identifier))
 		result.WriteString(fmt.Sprintf("🆔 项目ID(project_id): %s\n", project.ID))
-		result.WriteString(fmt.Sprintf("�� 类型: %s\n", project.Type))
-		result.WriteString(fmt.Sprintf("�� 状态: %s\n", project.State))
+		result.WriteString(fmt.Sprintf("类型: %s\n", project.Type))
+		result.WriteString(fmt.Sprintf("状态: %s\n", project.State))
 		result.WriteString(fmt.Sprintf("📦 可见性: %s\n", project.Visibility))
 
 		if project.Color != "" {

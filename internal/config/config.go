@@ -23,11 +23,12 @@ type Config struct {
 
 // ServerConfig 服务器配置
 type ServerConfig struct {
-	Name            string `yaml:"name"`
-	Version         string `yaml:"version"`
-	Port            int    `yaml:"port"`
-	Host            string `yaml:"host"`
-	PingCodeBaseUrl string `yaml:"pingcode_base_url"`
+	Name              string `yaml:"name"`
+	Version           string `yaml:"version"`
+	Port              int    `yaml:"port"`
+	Host              string `yaml:"host"`
+	PingCodeBaseUrl   string `yaml:"pingcode_base_url"`
+	PingCodeAuthToken string `yaml:"pingcode_auth_token"`
 }
 
 // LoggingConfig 日志配置
@@ -242,10 +243,18 @@ type LogConfig struct {
 	Daily      bool
 }
 
-// GetPingCodeBaseUrl 获取 PingCode 的基础 URL
+// 获取 PingCode 的基础 URL
 func GetPingCodeBaseUrl() string {
 	if appConfig == nil {
 		return ""
 	}
 	return appConfig.Server.PingCodeBaseUrl
+}
+
+// 获取 PingCode 的授权 token 信息
+func GetPingCodeAuthToken() string {
+	if appConfig == nil {
+		return ""
+	}
+	return appConfig.Server.PingCodeAuthToken
 }
